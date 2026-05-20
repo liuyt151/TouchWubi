@@ -105,6 +105,8 @@ switches:
     comment: "字符全角/半角"
 
 engine:
+  filters/+:
+    - lua_filter@*single_phrase_priority       # 单字/词组优先过滤器
   translators/+:
     - lua_translator@*email_suffix_translator  # 显示常用邮箱后缀
     - lua_translator@*input_statistics         # 输入统计（/tj 等）
@@ -120,7 +122,7 @@ speller/+:
   auto_select_pattern: ^;.$|^\w{5}$
   # 启用编码补全：允许4码匹配5码前缀
   enable_completion: true
-  algebra/+:                               # algebra: 音节/编码变换规则列表,使用 /+/ 表示“追加到原列表末尾”
+  algebra/+:                               # algebra: 音节/编码变换规则列表,使用 /+/ 表示"追加到原列表末尾"
 # ========================================
 # 🌟 通配符规则（用于模糊五笔输入）
 # ========================================

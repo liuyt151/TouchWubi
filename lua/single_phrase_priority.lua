@@ -3,12 +3,32 @@
 -- 作者：基于TouchWB项目扩展
 -- 日期：2026-05-20
 
-local basic = require('lib/basic')
-local utf8chars = basic.utf8chars
-
 -- 开关配置
 local single_char_priority_key = "single_char_priority"  -- 单字优先开关
 local phrase_priority_key = "phrase_priority"            -- 词组优先开关
+
+-- 获取UTF-8字符数
+local function utf8len(text)
+    if not text or text == "" then
+        return 0
+    end
+    local len = 0
+    for i = 1, #text do
+        local byte = string.byte(text, i)
+        -- UTF-8字符的判断
+        if byte >= 0x80 then
+            if byte >= 0xF0 then
+                i = i + 3
+            elseif byte >= 0xE0 then
+                i = i + 2
+            elseif byte >= 0xC0 then
+                i = i + 1
+            end
+        end
+        len = len + 1
+    end
+    return len
+end
 
 -- 主过滤器函数
 local function filter(input, env)
@@ -30,14 +50,22 @@ local function filter(input, env)
         table.insert(candidates, cand)
     end
 
+    -- 如果只有一个候选或没有候选，直接返回
+    if #candidates <= 1 then
+        for _, cand in ipairs(candidates) do
+            yield(cand)
+        end
+        return
+    end
+
     -- 根据设置排序
     if single_char_priority then
         -- 单字优先：单字排在前面，词组排在后面
         local single_chars = {}
         local phrases = {}
-        
+
         for _, cand in ipairs(candidates) do
-            local len = utf8.len(cand.text)
+            local len = utf8len(cand.text)
             if len == 1 then
                 table.insert(single_chars, cand)
             else
@@ -56,9 +84,9 @@ local function filter(input, env)
         -- 词组优先：词组排在前面，单字排在后面
         local single_chars = {}
         local phrases = {}
-        
+
         for _, cand in ipairs(candidates) do
-            local len = utf8.len(cand.text)
+            local len = utf8len(cand.text)
             if len == 1 then
                 table.insert(single_chars, cand)
             else
