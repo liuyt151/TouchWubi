@@ -51,49 +51,61 @@ switches:
     states: [ 显拼, 隐拼 ]
     comment: "显示/隐藏单字带声调拼音"
 
-  # 开关4：配对标点控制（pair_symbol）
+  # 开关4：单字优先控制
+  - name: single_char_priority
+    reset: 0                # 默认值为0（关闭）
+    states: [ 词优, 单优 ]
+    comment: "单字优先（单字排在前面）"
+
+  # 开关5：词组优先控制
+  - name: phrase_priority
+    reset: 0                # 默认值为0（关闭）
+    states: [ 单优, 词优 ]
+    comment: "词组优先（词组排在前面）"
+
+  # 开关6：配对标点控制（pair_symbol）
   - name: pair_symbol
     reset: 0                # 默认值为0（关闭配对）
     states: [ "关配", "开配" ]
     comment: "配对标点（括号、引号等自动成对）"
 
-  # 开关5：超级提示控制（super_tips）
+  # 开关7：超级提示控制（super_tips）
   - name: super_tips
     reset: 0                # 默认值为0（关闭提示）
     states: [ 关提, 开提 ]
     comment: "超级提示"
 
-  # 开关6：中英转换控制（ce_trans）
+  # 开关8：中英转换控制（ce_trans）
   - name: ce_trans
     reset: 0                # 默认值为0（翻译关闭）
     states: [ 关译, 开译 ]
     comment: "中英文互译"
 
-  # 开关7：字符集控制（GB2312）
+  # 开关9：字符集控制（GB2312）
   - name: GB2312
     reset: 0                # 默认值为0（扩展字符集）
     states: [ 扩展, 常用 ]
     comment: "常用字符集（GB2312）过滤"
 
-  # 开关8：Emoji表情显示控制（show_es）
+  # 开关10：Emoji表情显示控制（show_es）
   - name: show_es
     reset: 0                # 默认值为0（隐藏表情）
     states: [ 隐表, 显表 ]
     comment: "Emoji 表情"
 
-  # 开关9：简繁转换控制（zh_trad）
+  # 开关11：简繁转换控制（zh_trad）
   - name: zh_trad
     reset: 0                # 默认值为0（简体）
     states: [ 简体, 繁体 ]
     comment: "简繁转换"
 
-  # 开关10：标点符号全半角控制（ascii_punct）
+  # 开关12：标点符号全半角控制（ascii_punct）
   - name: ascii_punct
     reset: 0                # 默认值为0（全角标点）
-    states: [ 。，,．， ]
+    states: [ 。。, ．． ]
     comment: "标点符号全角/半角"
 
-  # 开关11：半/全角转换控制（full_shape）
+  # 开关13：半/全角转换控制（full_shape）
   - name: full_shape
     reset: 0                # 默认值为0（半角字符）
     states: [ 半角, 全角 ]
@@ -136,6 +148,8 @@ engine:
     - lua_filter@*new_spelling
     # Lua过滤器：超序列过滤器（处理候选项排序）
     - lua_filter@*super_sequence*F
+    # Lua过滤器：单字/词组优先过滤器
+    - lua_filter@*single_phrase_priority
     # 简化器：执行通用简化和过滤操作
     - simplifier
     # 中英转换过滤器：中文英文互译
