@@ -1,0 +1,458 @@
+# encoding: utf-8
+# author: Shawx、Liuyt151
+# date: 2026-05-15
+# update_time: "2026-05-20"
+# description: 五笔拼音混合模式
+
+schema:
+  # 唯一标识符，用于区分不同的方案
+  schema_id: wubi_pinyin_mix
+  # 方案显示名称
+  name: "笔音双混"
+  # 版本号
+  version: "v2.0"
+  # 中文状态图标文件路径
+  icon: "icons/CN.ico"
+  # 英文状态图标文件路径
+  ascii_icon: "icons/EN.ico"
+  # 全角状态图标文件路径
+  full_icon: "icons/full.ico"
+  # 半角状态图标文件路径
+  half_icon: "icons/half.ico"
+  # 作者信息列表
+  author:
+    - Liuyt151
+    - https://github.com/liuyt151/TouchWubi
+  description: |
+    流萤
+      流光一瞬，不羡永恒。
+      萤火虽微，自照前程。
+# 依赖的其他方案列表
+  dependencies:
+    - pinyin
+    - wubi
+    - wb_spelling
+
+# 功能开关列表配置
+switches:
+  # 开关1：编码（五笔码）显示控制
+  - name: new_hide_code
+    reset: 0                # 默认值为0（显示字型编码）
+    states: [ 显码, 隐码 ]
+    comment: "显示/隐藏五笔字型编码（单字）"
+
+  # 开关2：字根（部件拆分）显示控制
+  - name: new_spelling
+    reset: 1                # 默认值为1（显示部件拆分）
+    states: [ 隐根, 显根 ]
+    comment: "显示/隐藏汉字部件拆分（字根）"
+
+  # 开关3：单字拼音显示控制
+  - name: new_hide_pinyin
+    reset: 0                # 默认值为0（显示带声调拼音）
+    states: [ 显拼, 隐拼 ]
+    comment: "显示/隐藏单字带声调拼音"
+
+  # 开关新增：词组拼音/字根拆分切换
+  - name: new_phrase_pinyin
+    reset: 0                # 默认值为0（隐声模式，显示字根拆分）
+    states: [ 隐声, 显声 ]
+    comment: "词组拼音/字根拆分切换（显声/隐声）"
+
+  # 开关4：配对标点控制（pair_symbol）
+  - name: pair_symbol
+    reset: 0                # 默认值为0（关闭配对）
+    states: [ "关配", "开配" ]
+    comment: "配对标点（括号、引号等自动成对）"
+
+  # 开关5：超级提示控制（super_tips）
+  - name: super_tips
+    reset: 0                # 默认值为0（关闭提示）
+    states: [ 关提, 开提 ]
+    comment: "超级提示"
+
+  # 开关6：中英转换控制（ce_trans）
+  - name: ce_trans
+    reset: 0                # 默认值为0（翻译关闭）
+    states: [ 关译, 开译 ]
+    comment: "中英文互译"
+
+  # 开关7：字符集控制（GB2312）
+  - name: GB2312
+    reset: 0                # 默认值为0（扩展字符集）
+    states: [ 扩展, 常用 ]
+    comment: "常用字符集（GB2312）过滤"
+
+  # 开关8：Emoji表情显示控制（show_es）
+  - name: show_es
+    reset: 0                # 默认值为0（隐藏表情）
+    states: [ 隐表, 显表 ]
+    comment: "Emoji 表情"
+
+  # 开关9：简繁转换控制（zh_trad）
+  - name: zh_trad
+    reset: 0                # 默认值为0（简体）
+    states: [ 简体, 繁体 ]
+    comment: "简繁转换"
+
+  # 开关10：标点符号全半角控制（ascii_punct）
+  - name: ascii_punct
+    reset: 0                # 默认值为0（全角标点）
+    states: [ 。，,．， ]
+    comment: "标点符号全角/半角"
+
+  # 开关11：半/全角转换控制（full_shape）
+  - name: full_shape
+    reset: 0                # 默认值为0（半角字符）
+    states: [ 半角, 全角 ]
+    comment: "字符全角/半角"
+
+# 引擎配置块，定义输入法引擎的核心组件
+engine:
+  mixed_input: true   # 告诉 new_spelling.Lua 这是混输方案
+  # 处理器列表（processors）：按顺序处理用户输入
+  processors:
+    # ASCII模式切换处理器：处理中英文输入切换
+    - ascii_composer
+    # Lua处理器：自造词记录处理器（监控并记录用户自造词）
+    - lua_processor@*Submit_text
+    # Lua处理器：智能上屏处理器（五笔四码自动上屏，拼音保持候选）
+    - lua_processor@*smart_commit
+    # Lua处理器：超级提示处理器
+    - lua_processor@*super_tips
+    # Lua处理器：超序列前移处理器（Super Sequence Processor）
+    - lua_processor@*super_sequence*P
+    # Lua处理器：配对标点处理器
+    - lua_processor@*pair_punct*processor
+    # 识别器：识别特殊输入模式（如网址、邮箱、命令等）
+    - recognizer
+    # 按键绑定器：处理特殊按键绑定和快捷键
+    - key_binder
+    # 拼写处理器：处理拼音拼写和纠错
+    - speller
+    # 标点处理器：处理标点符号输入
+    - punctuator
+    # 选择器：处理候选项选择操作（数字键、方向键等）
+    - selector
+    # 导航器：处理候选项导航操作（翻页等）
+    - navigator
+    # 快速编辑器：提供快速编辑功能（如删除、清空等）
+    - express_editor
+
+  # 过滤器列表（filters）：对候选项进行过滤和转换
+  filters:
+    # Lua过滤器：新拼写过滤器（处理字根显示）
+    - lua_filter@*new_spelling
+    # Lua过滤器：超序列过滤器（处理候选项排序）
+    - lua_filter@*super_sequence*F
+    # 简化器：执行通用简化和过滤操作
+    - simplifier
+    # 中英转换过滤器：中文英文互译
+    - simplifier@ce_en_conversion
+    # Lua过滤器：翻译合并过滤器（将拆分的翻译候选项合并为一行）
+    - lua_filter@*translate_merge
+    # Emoji转换过滤器：将文本转换为Emoji表情
+    - simplifier@es_conversion
+    # 唯一化器：去除重复的候选项
+    - uniquifier
+  
+  # 分段器列表（segmentors）：将输入分段成不同的处理单元
+  segmentors:
+    # ASCII分段器：处理纯ASCII输入
+    - ascii_segmentor
+    # 匹配器：根据模式匹配输入分段（如日程命令、表达式等）
+    - matcher
+    # Affix分段器：自造词分段器（识别`键开头的输入）
+    - affix_segmentor@mkst
+    # ABC分段器：处理字母数字输入（拼音、五笔编码）
+    - abc_segmentor
+    # 标点分段器：处理标点符号输入
+    - punct_segmentor
+    # 兜底分段器：处理未被其他分段器匹配的输入
+    - fallback_segmentor
+    # Lua分段器：配对标点分段器
+    - lua_segmentor@*pair_punct*segmentor
+  
+  # 翻译器列表（translators）：将输入转换为候选项
+  translators:
+    # 标点翻译器：翻译标点符号
+    - punct_translator
+    # Lua翻译器：英文→中文翻译器（支持英文单词翻译）
+    - lua_translator@*english_translator
+    # 表格翻译器：主翻译器，使用五笔码表进行翻译
+    - table_translator
+    # Lua翻译器：自造词翻译器（读取文本文件，即时生效，全局变量）
+    - lua_translator@user_coined_translator
+    # 表格翻译器：用户词典翻译器（自动学习用户词组）
+    - table_translator@fixed
+    # 表格翻译器：`键引导的自造词临时翻译器
+    - table_translator@mkst
+    # 反查翻译器：支持拼音反查五笔编码
+    - reverse_lookup_translator
+    # Lua翻译器：计算器翻译器（处理 = 开头的数学表达式）
+    - lua_translator@*calculator
+    # Lua翻译器：日程翻译器（处理 /jc、/jq、/gz、/date 等命令）
+    - lua_translator@*schedule                 # 日程命令（/jc 等）
+    - lua_translator@*email_suffix_translator  # 显示常用邮箱后缀
+    - lua_translator@*input_statistics         # 输入统计（/tj 等）
+
+# 拼音拼写器配置（定义输入字符集和拼写规则）
+speller:
+  # 字母表：定义可用的字母字符（按字母逆序排列，包含反引号用于自造词）
+  alphabet: zyxwvutsrqponmlkjihgfedcba`/@=
+  # 首字母：定义可作为首字母的字符
+  initials: zyxwvutsrqponmlkjihgfedcba`/@=
+  # 分隔符：拼音的分隔符（空格或单引号），反引号用于自造词
+  delimiter: " '`"
+  # 最大编码长度（自造词需要较长的编码）
+  max_code_length: 10000
+  # 拼写代数规则：定义输入转换规则
+  algebra:
+    # 规则1：删除匹配 "xx" 的输入（用于特殊触发）
+    - erase/^xx$/
+    # 规则2：首字母缩写规则，取第一个字母（例如："hello" -> "h"）
+    - abbrev/^([a-z]).+$/$1/
+    # 规则3：首字母缩写规则，处理 zh、ch、sh（例如："zhang" -> "zh"）
+    - abbrev/^([zcs]h).+$/$1/
+
+# 五笔翻译器配置（主翻译器，使用五笔码表）
+translator:
+  # 使用的字典文件名
+  dictionary: wubi
+  # 棱镜文件名（编译后的字典，用于快速查询）
+  prism: wubi_pinyin_mix
+  # 数据库类型：使用表格数据库
+  db_class: tabledb
+  # 初始质量值：候选项的优先级权重（1000为最高优先级）
+  initial_quality: 500
+  # 对特定模式禁用用户词典：以z开头的编码不记录到用户词典
+  disable_user_dict_for_patterns:
+    # 匹配以z开头的所有编码
+    - "^z.*$"
+  # 是否启用字符集过滤器（false=不启用，支持GBK扩展字符）
+  enable_charset_filter: false
+  # 是否启用整句输入（false=不启用，仅支持词组输入）
+  enable_sentence: false
+  # 是否启用用户词典（false=不启用，不记录用户输入）
+  enable_user_dict: false
+  # 是否启用编码器（false=不启用，不自动生成词组）
+  enable_encoder: false
+  # 是否编码提交历史（false=不启用，不学习用户习惯）
+  encode_commit_history: false
+  # 最大词组长度：最多支持4个字的词组
+  max_phrase_length: 4
+  # 是否启用联想（false=不启用，不提供词汇联想）
+  enable_completion: false
+
+# 拼音反查配置（支持用拼音反查五笔编码）
+reverse_lookup:
+  dictionary: pinyin                # 反查使用的字典：拼音字典
+  preedit_format:
+    # 规则1：n/l 后的 v 转换为 ü
+    - xform/([nl])v/$1ü/
+    # 规则2：n/l 后的 ue 转换为 üe
+    - xform/([nl])ue/$1üe/
+    # 规则3：j/q/x/y 后的 v 转换为 u
+    - xform/([jqxy])v/$1u/
+
+# 简繁转换器（支持简繁体转换）
+simplifier:
+  # OpenCC配置文件：s2t.json（简体转繁体）
+  opencc_config: s2t.json
+  # 控制开关名：zh_trad（对应前面定义的简繁开关）
+  option_name: zh_trad
+
+# Emoji 表情转换器（将文本转换为Emoji表情）
+es_conversion:
+  # OpenCC配置文件：es.json（Emoji转换规则）
+  # 使用相对路径，Rime会在其工作目录下的opencc文件夹中查找
+  opencc_config: es.json
+  # 控制开关名：show_es（对应前面定义的Emoji显示开关）
+  option_name: show_es
+  # 提示：none（不显示提示信息）
+  tips: none
+  # 是否继承注释：false（不继承原文本的注释）
+  inherit_comment: false
+
+# 中/英翻译转换器（中文/英文互译）
+ce_en_conversion:
+  # OpenCC配置文件：ce.json（中/英翻译转换规则）
+  opencc_config: ce.json
+  # 控制开关名：ce_trans（对应前面定义的中/英翻译转换开关）
+  option_name: ce_trans
+  # 提示：none（不显示提示信息）
+  tips: none
+  # 是否继承注释：false（不继承原文本的注释）
+  inherit_comment: false
+
+# Lua 反向数据库（用于字根和编码显示）
+lua_reverse_db:
+  # 拼写反查字典：wb_spelling（五笔拼写字典）
+  spelling: wb_spelling
+  # 编码反查字典：wb_spelling
+  code: wb_spelling
+
+# 识别器配置（定义特殊输入模式的识别规则）
+recognizer:
+  # 导入预设配置：default（使用默认的识别规则）
+  import_preset: default
+  # 识别模式列表
+  patterns:
+    # 自造词模式：匹配`键引导的自造词输入（例如：aa`bb 表示两个字的自造词）
+    mkst: "^[a-y]*`[a-y`]*$"
+    # 日程命令模式：匹配以 / 开头后跟 jc、jq、gz、date 的输入（支持所有快捷键）
+    schedule: "^/(jc|jq|gz|date)"
+    # 表达式模式：匹配以 = 开头的输入（计算器表达式）
+    expression: "^=.*$"
+    # 邮箱模式：匹配标准的邮箱格式
+    email: "^[A-Za-z][-_.0-9A-Za-z]*@.*$"
+    # URL模式：匹配各种网址格式（www、https、ftp、mailto、file等）
+    url: "^(www[.]|https?:|ftp[.:]|mailto:|file:).*$|^[a-z]+[.].+$"
+    # 标点符号模式：匹配以/开头的数字或字母（用于调取symbol.yaml中的符号）
+    punct: "^/([0-9]0?|[A-Za-z]+)$"
+
+# 按键绑定配置（定义特殊按键和快捷键功能）
+key_binder:
+  # 超级提示上屏键配置
+  tips_key: "slash"
+
+  # Super Sequence（超序列）功能配置：候选项快速排序
+  sequence:
+    # 向上移动：Ctrl+J 将当前候选项前移
+    up: "Control+j"
+    # 向下移动：Ctrl+K 将当前候选项后移
+    down: "Control+k"
+    # 重置排序：Ctrl+L 恢复原始排序
+    reset: "Control+l"
+    # 置顶：Ctrl+P 将当前候选项置顶
+    pin: "Control+p"
+
+  # 按键绑定规则列表
+  bindings:
+    # 绑定1：当有候选菜单时，左箭头键发送上箭头键（在候选项中向上移动）
+    - {send: Up, accept: Left, when: has_menu}
+    # 绑定2：当有候选菜单时，右箭头键发送下箭头键（在候选项中向下移动）
+    - {send: Down, accept: Right, when: has_menu}
+    # 绑定3：当有候选菜单时，减号键发送上翻页键（向上翻页）
+    - {send: Page_Up, accept: minus, when: has_menu}
+    # 绑定4：当有候选菜单时，等号键发送下翻页键（向下翻页）
+    - {send: Page_Down, accept: equal, when: has_menu}
+    # 绑定5：正在输入时，空格键发送Esc键（取消输入）
+    - {send: Escape, accept: space, when: composing}
+    # 绑定6：当有候选菜单时，空格键保持原样（选中第一个候选项）
+    - {send: space, accept: space, when: has_menu}
+    # 绑定7：Ctrl+Shift+4 切换简繁体
+    - {toggle: zh_trad, accept: "Control+Shift+4", when: always}
+    # 绑定8：Ctrl+Shift+$ 切换简繁体（美元符号）
+    - {toggle: zh_trad, accept: "Control+Shift+dollar", when: always}
+    # 绑定9：Ctrl+Shift+F 切换简繁体
+    - {toggle: zh_trad, accept: "Control+Shift+F", when: always}
+    # 绑定10：Ctrl+Shift+H 切换字根显示
+    - {toggle: new_spelling, accept: "Control+Shift+H", when: always}
+    # 绑定11：Ctrl+Shift+J 切换拼音显示
+    - {toggle: new_hide_pinyin, accept: "Control+Shift+J", when: always}
+    # 绑定12：Ctrl+Shift+K 切换编码显示
+    - {toggle: new_hide_code, accept: "Control+Shift+K", when: always}
+    # 绑定13：Ctrl+Shift+E 切换Emoji显示
+    - {toggle: show_es, accept: "Control+Shift+E", when: always}
+    # 绑定14：Ctrl+Shift+U 切换字符集
+    - {toggle: GB2312, accept: "Control+Shift+U", when: always}
+    # 绑定15：Shift+空格 切换全半角
+    - {when: always, accept: Shift+space, toggle: full_shape}
+    # 绑定16：Ctrl+. 切换标点全半角
+    - {when: always, accept: Control+period, toggle: ascii_punct}
+    # 绑定17：Ctrl+Shift+T 切换中英转换
+    - {toggle: ce_trans, accept: "Control+Shift+T", when: always}
+    # 绑定17：Control+Shift+P 切换配对标点开关
+    - {toggle: pair_symbol, accept: "Control+Shift+P", when: always}
+    # 绑定19：分号引号上屏二三候选
+    - {accept: semicolon, send: 2, when: has_menu}
+    - {accept: apostrophe, send: 3, when: has_menu}
+
+    # 小键盘数字映射到主键盘，支持计算器输入数字金额等场景
+    # 小键盘0映射为主键盘0
+    - {accept: KP_0, send: 0, when: composing}
+    # 小键盘1映射为主键盘1
+    - {accept: KP_1, send: 1, when: composing}
+    # 小键盘2映射为主键盘2
+    - {accept: KP_2, send: 2, when: composing}
+    # 小键盘3映射为主键盘3
+    - {accept: KP_3, send: 3, when: composing}
+    # 小键盘4映射为主键盘4
+    - {accept: KP_4, send: 4, when: composing}
+    # 小键盘5映射为主键盘5
+    - {accept: KP_5, send: 5, when: composing}
+    # 小键盘6映射为主键盘6
+    - {accept: KP_6, send: 6, when: composing}
+    # 小键盘7映射为主键盘7
+    - {accept: KP_7, send: 7, when: composing}
+    # 小键盘8映射为主键盘8
+    - {accept: KP_8, send: 8, when: composing}
+    # 小键盘9映射为主键盘9
+    - {accept: KP_9, send: 9, when: composing}
+    # 小键盘小数点映射为主键盘小数点
+    - {accept: KP_Decimal, send: period, when: composing}
+    # 小键盘加号映射为主键盘加号
+    - {accept: KP_Add, send: plus, when: composing}
+    # 小键盘减号映射为主键盘减号
+    - {accept: KP_Subtract, send: minus, when: composing}
+    # 小键盘乘号映射为主键盘星号
+    - {accept: KP_Multiply, send: asterisk, when: composing}
+    # 小键盘除号映射为主键盘斜杠
+    - {accept: KP_Divide, send: slash, when: composing}
+    # 保证 / 键可用（日程命令、超级提示上屏）
+    - {accept: slash, send: slash, when: always}
+
+# 超级提示配置
+tips:
+  disabled_types: []
+
+# 标点符号配置
+punctuator:
+  # 导入预设符号配置：symbols（使用 symbols.yaml 中定义的符号）
+  import_preset: symbols
+
+# 五笔分词器配置（ABC分段器）
+abc_segmentor:
+  # 额外标签：为分段添加标签
+  extra_tags:
+    # 反向查询标签：标识此分段可用于反向查询
+    - reverse_lookup
+
+# 用户词典翻译器（自动学习用户词组，即时生效）
+fixed:
+  db_class: tabledb
+  dictionary: wubi
+  disable_user_dict_for_patterns:
+    - "^z.*$"
+  enable_charset_filter: false
+  enable_completion: false
+  enable_encoder: true
+  enable_sentence: false
+  enable_user_dict: true
+  encode_commit_history: false
+  initial_quality: 850                      # 降低优先级，避免错误词组永久固化
+  max_phrase_length: 4
+
+# 自造词临时翻译器（`键引导）
+mkst:
+  db_class: tabledb
+  dictionary: wubi
+  disable_user_dict_for_patterns:
+    - "^z.*$"
+  enable_charset_filter: false
+  enable_completion: false
+  enable_encoder: false
+  enable_sentence: true
+  enable_user_dict: false
+  encode_commit_history: false
+  initial_quality: 450
+  max_phrase_length: 4
+  prefix: "`"
+  tag: mkst
+  tips: "〔自造词〕"
+
+# 样式配置（输入法界面样式）
+style:
+  # 内联编辑：false（不使用内联编辑，显示在独立区域）
+  inline_preedit: false

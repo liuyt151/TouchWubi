@@ -1,0 +1,24 @@
+name: "TouchWB"
+author: "Liuyt151"
+version: "2.0"
+description: "主题基于触宝输入法样式，设计14键拇指键盘布局，Z键独立，适合拇指击键,配合14键专用音辅版字典可有效降低重码."
+create_time: "2025-10-25"
+update_time: "2026-05-20"
+# 支持的设备。有指定的只取指定的，没指定的取全部
+supported_devices:
+  pc: ["wubi", "wubi_pinyin_mix", "pinyin"]
+# 方案使用主题
+use_theme:
+  # 如果没有自定义主题，则使用默认主题.
+  # 右边的值是主题的目录名，也可以是方案下的主题名。需要绝对路径。
+  # 例如: 在程序目录的themes下，rime_ice/themes/default 是默认主题。
+  # 在程序目录的schemas为用户方案,其下主题目录为themes，themes/default 是自定义主题。
+  default: "themes/default"
+  # 自定义主题
+  custom:
+    # 自定义主题的名称，路径同上。
+    "wubi": "TouchWB/themes/t26_wubi"
+    "wubi_14": "TouchWB/themes/t14_wubi"
+    "wubi_pinyin_mix": "TouchWB/themes/t26_wubi"
+    "wubi_pinyin_mix_14": "TouchWB/themes/t14_wubi"
+    "pinyin": "TouchWB/themes/t26_wubi"

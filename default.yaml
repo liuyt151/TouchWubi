@@ -1,0 +1,64 @@
+# encoding: utf-8
+# author: Shawx、Liuyt151
+# date: 2026-01-17
+# description: 默认配置设置
+
+config_version: '2.3'                                  # 指定使用的 Rime 配置语法版本，注意这个不能删除
+
+schema_list:                                           # 定义可用的输入方案列表
+  - {schema: wubi}                                     # 方案1：五笔输入法
+  - {schema: wubi_14}                                  # 方案2：拇指五笔输入法
+  - {schema: wubi_pinyin_mix}                          # 方案3：五笔拼音混合输入法
+  - {schema: wubi_pinyin_mix_14}                       # 方案4：拇指五笔拼音混合输入法
+  - {schema: wb_spelling}                              # 方案5：五笔字型（自定义字根方案）
+
+switcher:                                              # 方案切换设置
+  caption: 【输入法设置】                              # 切换菜单的标题
+  hotkeys:                                             # 触发切换的快捷键
+    - Control+0                                        # 快捷键1：Ctrl+0
+    - Control+Shift+0                                  # 快捷键2：Ctrl+Shift+0
+  save_options:                                        # 保存的选项状态（重启后保留）
+    - full_shape                                       # 全角模式
+    - ascii_punct                                      # 中文标点
+    - simplification                                   # 简体中文
+    - extended_charset                                 # 扩展字符集
+    - zh_hant                                          # 繁体中文
+    - zh_hans                                          # 简体中文
+    - zh_hant_tw                                       # 台湾繁体
+  fold_options: true                                   # 折叠相似的选项（如简/繁体分组显示）
+  abbreviate_options: true                             # 使用缩写显示选项
+  option_list_separator: '／'                          # 选项列表分隔符
+
+punctuator:                                            # 标点符号设置
+  full_shape:                                          # 全角标点配置
+    __include: symbols:/punctuator/full_shape
+  half_shape:                                          # 半角标点配置
+    __include: symbols:/punctuator/half_shape
+  ascii_style:                                         # ASCII标点配置
+    __include: symbols:/punctuator/ascii_style
+
+key_binder:                                            # 键盘绑定设置
+  bindings:                                            # 绑定规则
+    __patch:                                           # 通过补丁方式引用其他配置，对应文件：key_bindings.yaml
+      - key_bindings:/emacs_editing                    # Emacs 风格编辑键
+      - key_bindings:/move_by_word_with_tab            # Tab 键移动单词
+
+recognizer:                                            # 模式识别器（用于特殊输入模式）
+  patterns:                                            # 正则表达式模式
+    email: "^[A-Za-z][-_.0-9A-Za-z]*@.*$"              # 邮箱地址识别
+    # uppercase: "[A-Z][-_+.'0-9A-Za-z]*$"             # 大写字母模式（已注释）
+    url: "^(www[.]|https?:|ftp[.:]|mailto:|file:).*$|^[a-z]+[.].+$"  # URL识别
+
+ascii_composer:                                        # ASCII 字符输入设置
+  good_old_caps_lock: true                             # 启用传统的 CapsLock 行为
+  switch_key:                                          # 切换键功能定义
+    Shift_L: commit_code                               # 左Shift：提交编码，比如：输入wqvb "你好" 按住左Shift后显示wqvb编码
+    Shift_R: commit_code                               # 右Shift：提交编码，同理
+    Control_L: noop                                    # 左Ctrl：无操作
+    Control_R: noop                                    # 右Ctrl：无操作
+    Caps_Lock: clear                                   # CapsLock：清空输入
+    Eisu_toggle: clear                                 # 英数键：清空输入
+
+menu:                                                  # 候选词菜单设置
+  page_size: 6                                         # 每页显示6个候选词
+  alternative_select_labels: [ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 ]  # 候选词选择标签

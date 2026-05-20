@@ -1,0 +1,110 @@
+# encoding: utf-8
+# author: Shawx、Liuyt151
+# date: 2025-12-31
+# update_time: "2026-05-20"
+# description: 纯拼音输入模式
+# 更新：为另外的拇指混输增加14键映射
+schema:
+  schema_id: pinyin
+  name: "流萤拼音"
+  version: "v2.0"
+  icon: "icons/CN.ico"
+  ascii_icon: "icons/EN.ico"
+  full_icon: "icons/full.ico"
+  half_icon: "icons/half.ico"
+  author:
+    - Liuyt151
+    - https://github.com/liuyt151/TouchWubi
+  description: |
+    流萤
+      流光一瞬，不羡永恒。
+      萤火虽微，自照前程。
+  dependencies:
+    - wubi
+
+switches:
+  - name: ascii_mode
+    reset: 0
+    states: [ 中, 英 ]
+
+engine:
+  processors:
+    - ascii_composer
+    - recognizer
+    - key_binder
+    - speller
+    - punctuator
+    - selector
+    - navigator
+    - express_editor
+  segmentors:
+    - ascii_segmentor
+    - matcher
+    - abc_segmentor
+    - punct_segmentor
+    - fallback_segmentor
+  translators:
+    - punct_translator
+    - script_translator
+    - reverse_lookup_translator
+  filters:
+    - simplifier
+    # - reverse_lookup_filter@ci_reverse_lookup # 注释本行去掉拼音模式下编码提示
+    - uniquifier
+
+speller:
+  alphabet: zyxwvutsrqponmlkjihgfedcba
+  delimiter: " '"
+  algebra:
+    - abbrev/^([a-z]).+$/$1/
+    - abbrev/^([zcs]h).+$/$1/
+    - derive/^([nl])ue$/$1ve/
+    - derive/^([jqxy])u/$1v/
+    - derive/un$/uen/
+    - derive/ui$/uei/
+    - derive/iu$/iou/
+    - derive/([aeiou])ng$/$1gn/
+    - derive/([dtngkhrzcs])o(u|ng)$/$1o/
+    - derive/ong$/on/
+    - derive/ao$/oa/
+    - derive/([iu])a(o|ng?)$/a$1$2/
+
+# =============14键五笔映射（用于五笔拼音混输）
+    - derive/w/q/     # W 键 → 视为 Q 区（金）
+    - derive/r/e/     # R 键 → 视为 E 区（月）
+    - derive/y/t/     # Y 键 → 视为 T 区（禾）
+    - derive/i/u/     # I 键 → 视为 U 区（山）
+    - derive/p/o/     # P 键 → 视为 O 区（人）
+    - derive/s/a/     # S 键 → 视为 A 区（日）
+    - derive/f/d/     # F 键 → 视为 D 区（口）
+    - derive/h/g/     # H 键 → 视为 G 区（王）
+    - derive/k/j/     # K 键 → 视为 J 区（田）
+    - derive/c/x/     # C 键 → 视为 X 区（女）
+    - derive/b/v/     # B 键 → 视为 V 区（已）
+    - derive/m/n/     # M 键 → 视为 N 区（力）
+# =============通配符规则（用于模糊五笔输入）
+translator:
+  dictionary: pinyin
+  preedit_format:
+    - xform/([nl])v/$1ü/
+    - xform/([nl])ue/$1üe/
+    - xform/([jqxy])v/$1u/
+
+punctuator:
+  import_preset: symbols
+
+key_binder:
+  import_preset: default
+
+recognizer:
+  import_preset: default
+  patterns:
+    punct: '^/([0-9]0?|[A-Za-z]+)$'
+    reverse_lookup: "^z[a-z]*'?$"
+  
+ci_reverse_lookup:
+  dictionary: wubi
+  enable_completion: true
+  tips: 〈拼音〉  
+
+  

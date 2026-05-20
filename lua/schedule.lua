@@ -1,0 +1,346 @@
+-- === 日程表小助手 ===
+-- Modified by ksqsf for Project Moran
+-- AMZ 万象新增节日候选,格式化问候语,重写农历倒计时
+-- Simplified by Jack Liu <https://aituyaa.com>
+-- 生成日程表候选，如：
+--[[
+    嗨，我是您的日程小助手，晚上好!  
+    ---------------------------------------
+    今天：2025年03月06日 星期四  
+    农历：乙巳年(蛇) 二月初七    
+    时间：19点31分42秒  
+    ---------------------------------------
+    2025  年进度：▒▒▒▒░░░░░░░░░░░░░ 17.8%  
+    距离 2026 年：还有 300 天  
+    ---------------------------------------
+    今天是 2025 年的第 10 周，3 月的第 1 周  
+    今年已度过 64 天，今天是第 65 天  
+    ---------------------------------------
+    距离: 妇女节 2025-03-08 	 < [ 02 ]天  
+    距离: 植树节 2025-03-12 	 < [ 06 ]天  
+    ---------------------------------------
+    距离: 春分 2025-03-20 	     < [ 14 ]天  
+    距离: 清明 2025-04-04 	     < [ 29 ]天  
+    ---------------------------------------
+
+    改版后：
+    嗨，下午好!〔17点29分05秒〕
+    2025年12月15日（第 51 周）星期一
+    2025年已过 348 天(95.6%)，共 365 天
+    农历：乙巳年十月廿六 · 蛇年 · 初冬象限 
+    2026年剩余 16 天｜农历新年 64 天
+    ▸ 平安夜 2025-12-24 	< [ 09 ]天
+    ▸ 圣诞节 2025-12-25 	< [ 10 ]天
+    ▸ 冬至 2025-12-21    	< [ 06 ]天
+    ▸ 小寒 2026-01-05   	< [ 21 ]天
+]]--
+
+require("lib/lunar")
+
+-- +++ 主函数 +++
+local function schedule(input, seg, env)
+    local engine = env.engine
+    local context = engine.context
+
+    if (input == "/jq") then
+        -- === 节气查询功能 ===
+        local current_date = os.date("%Y%m%d")
+        local jqs = GetNowTimeJq(current_date)
+        
+        local jq_info = "=== 二十四节气 ===\n"
+        jq_info = jq_info .. string.format("当前日期：%s年%s月%s日\n", 
+            os.date("%Y"), os.date("%m"), os.date("%d"))
+        jq_info = jq_info .. "------------------------\n"
+        
+        -- 显示最近的6个节气
+        for i = 1, math.min(6, #jqs) do
+            local jq_name, jq_date = jqs[i]:match("^(%S+)%s+(%d+%-%d+%-%d+)$")
+            if jq_name and jq_date then
+                local year, month, day = jq_date:match("^(%d+)-(%d+)-(%d+)$")
+                local formatted_date = string.format("%s年%02d月%02d日", year, tonumber(month), tonumber(day))
+                
+                -- 计算距离天数
+                local target_time = jq_date:gsub("-", "")
+                local diff_days = days_until(target_time)
+                
+                if diff_days == 0 then
+                    jq_info = jq_info .. string.format("● %s %s (今天)\n", jq_name, formatted_date)
+                elseif diff_days > 0 then
+                    jq_info = jq_info .. string.format("○ %s %s (还有%d天)\n", jq_name, formatted_date, diff_days)
+                end
+            end
+        end
+        
+        local candidates = {{jq_info, "节气查询"}}
+        generate_candidates("jieqi_query", seg, candidates)
+        
+    elseif (input == "/gz") then
+        -- === 干支历查询功能 ===
+        local current_datetime = os.date("%Y%m%d%H")
+        local gz_info = lunarJzl(current_datetime)
+        
+        local gz_detail = "=== 干支历信息 ===\n"
+        gz_detail = gz_detail .. string.format("当前日期：%s年%s月%s日 %s时\n", 
+            os.date("%Y"), os.date("%m"), os.date("%d"), os.date("%H"))
+        gz_detail = gz_detail .. "------------------------\n"
+        gz_detail = gz_detail .. string.format("干支：%s\n", gz_info)
+        
+        -- 获取农历信息作为补充
+        local lunar_info = Date2LunarDate(os.date("%Y%m%d"))
+        gz_detail = gz_detail .. string.format("农历：%s\n", lunar_info)
+        
+        local candidates = {{gz_detail, "干支查询"}}
+        generate_candidates("ganzi_query", seg, candidates)
+        
+    elseif (input == "/date") then
+        -- === 农历日期转换功能 ===
+        local current_date = os.date("%Y%m%d")
+        local lunar_date = Date2LunarDate(current_date)
+        
+        local date_info = "=== 农历日期信息 ===\n"
+        date_info = date_info .. string.format("公历：%s年%s月%s日 %s\n", 
+            os.date("%Y"), os.date("%m"), os.date("%d"), os.date("%A", os.time()))
+        date_info = date_info .. "------------------------\n"
+        date_info = date_info .. string.format("农历：%s\n", lunar_date)
+        
+        -- 添加反向转换示例
+        local solar_date = LunarDate2Date(tonumber(os.date("%Y%m%d"):sub(1,6) .. "01"), 0)
+        date_info = date_info .. "------------------------\n"
+        date_info = date_info .. string.format("农历本月初一对应的公历：%s\n", solar_date)
+        
+        -- 添加节气信息
+        local jqs = GetNowTimeJq(current_date)
+        for i = 1, math.min(2, #jqs) do
+            local jq_name, jq_date = jqs[i]:match("^(%S+)%s+(%d+%-%d+%-%d+)$")
+            if jq_name and jq_date then
+                local target_time = jq_date:gsub("-", "")
+                local diff_days = days_until(target_time)
+                if diff_days >= 0 and diff_days <= 15 then
+                    date_info = date_info .. string.format("最近节气：%s (还有%d天)\n", jq_name, diff_days)
+                    break
+                end
+            end
+        end
+        
+        local candidates = {{date_info, "农历转换"}}
+        generate_candidates("lunar_query", seg, candidates)
+
+    elseif (input == "/jc") then
+
+        -- ---〔 ❶ 问候语 〕---
+        local function get_greeting()
+            local current_hour = tonumber(os.date("%H"))
+            local greeting = ""
+
+            if current_hour >= 0 and current_hour < 6 then
+                greeting = "晚安!"
+            elseif current_hour >= 6 and current_hour < 12 then
+                greeting = "早上好!"
+            elseif current_hour >= 12 and current_hour < 14 then
+                greeting = "午安!"
+            elseif current_hour >= 14 and current_hour < 18 then
+                greeting = "下午好!"
+            else
+                greeting = "晚上好!"
+            end
+
+            return greeting
+        end
+        local greeting = get_greeting()
+
+
+        -- ---〔 ❷ 获取当前时间 〕---
+        -- 今天
+        local now = os.time()
+        local year = tonumber(os.date("%Y", now))
+        local month = tonumber(os.date("%m", now))
+        local day = tonumber(os.date("%d", now))
+        local week_day_str = chinese_weekday2(os.date("%w"))                -- 获取中文星期（例如 "星期三"）
+        -- 农历
+        local lunar_info_str = Date2LunarDate(os.date("%Y%m%d"))            -- 获取农历的天干地支和生肖等
+        -- 时间 ... 
+
+
+        -- ---〔 ❸ 时间进度 〕---
+        local day_of_year = tonumber(os.date("%j", now))                    -- 今年的第几天
+        local days_in_year = IsLeap(year)                                   -- 若为闰年 - 366
+        local year_progress = (day_of_year / days_in_year) * 100            -- 今年进度
+
+        -- 格式化百分比显示
+        local function format_percentage(percentage)
+            return string.format("%.1f%%", percentage)
+        end
+        
+        -- 格式化天数统计显示
+        -- local function format_day_count(day_of_year, days_in_year)
+        --     return string.format("%d，%d", day_of_year - 1, days_in_year)
+        -- end
+        local function format_day_count(days_in_year)
+            return string.format("%d", days_in_year)
+        end
+
+        local year_progress_text = format_percentage(year_progress)
+        local year_passed_days_text = format_day_count(day_of_year, days_in_year)
+
+
+        -- ---〔 ❹ 周天倒计时 〕---
+        -- 倒计周
+        local week_of_year = tonumber(os.date("%W", now)) + 1               -- 今年的第几周
+        local week_of_month = math.ceil(tonumber(os.date("%d", now)) / 7)   -- 当月的第几周
+        -- 计算距离下一年1月1日的天数
+        local next_year = year + 1
+        local new_year_time = os.time({
+            year = next_year,
+            month = 1,
+            day = 1
+        })
+        local diff_days_next_year = math.floor((new_year_time - now) / (24 * 3600))
+        
+        -- 计算到下一个农历新年的距离
+        local diff_days_lunar_new_year = GetDaysToNextLunarNewYear(os.date("%Y%m%d"))
+
+
+        -- ---〔 ❺ 节日倒计时 〕---
+        -- --- 遍历前三个节日并返回节日名称、日期、倒计时天数 ---
+        local upcoming_holidays = get_upcoming_holidays() or {}
+        local holiday_data = {}
+
+        local filtered_holidays = {}
+        -- 当今天就是节日时
+        local zero_holiday = '' 
+        local zero_found = false
+
+        for i = 1, math.min(3, #upcoming_holidays) do
+            local holiday = upcoming_holidays[i]
+
+            if holiday[3] == 0 then
+                -- 记录当天的节日名称
+                zero_holiday = holiday[1] 
+                zero_found = true
+            else
+                table.insert(filtered_holidays, holiday)
+            end
+        end
+
+        if zero_found then
+            -- 当今天是节日时，顺排存储后两个节日
+            for i = math.max(1, #filtered_holidays - 1), #filtered_holidays do
+                local holiday = filtered_holidays[i]
+                local year, month, day = holiday[2]:match("^(%d+)年(%d+)月(%d+)日")
+
+                if year and month and day then
+                    local formatted_date = string.format("%04d-%02d-%02d", tonumber(year), tonumber(month),
+                        tonumber(day))
+                    table.insert(holiday_data, {holiday[1], formatted_date, holiday[3]})
+                end
+            end
+        else
+            -- 今天不是节日时，存储前两个节日
+            for i = 1, math.min(2, #filtered_holidays) do
+                local holiday = filtered_holidays[i]
+                local year, month, day = holiday[2]:match("^(%d+)年(%d+)月(%d+)日")
+
+                if year and month and day then
+                    local formatted_date = string.format("%04d-%02d-%02d", tonumber(year), tonumber(month),
+                        tonumber(day))
+                    table.insert(holiday_data, {holiday[1], formatted_date, holiday[3]})
+                end
+            end
+        end
+
+
+        -- ---〔 ❻ 节气倒计时 〕---
+        -- --- 获取最近的三个节气 ---
+        local jqs = GetNowTimeJq(os.date("%Y%m%d", now))
+        local upcoming_jqs = {}
+        local zero_jieqi = ''                                               -- 记录今天的节气
+
+        -- 计算距离某个节气的天数
+        local function days_until_jieqi(jieqi)
+            local jieqi_date = jieqi:match("(%d+-%d+-%d+)$")                -- 提取节气日期部分
+            local target_time = jieqi_date:gsub("-", "")
+			local diff_days = days_until(target_time)
+
+            return diff_days
+        end
+
+        -- 遍历最近的 4 个节气
+        for i = 1, math.min(3, #jqs) do
+            local jieqi = jqs[i]
+            local diff_days = days_until_jieqi(jieqi)
+
+            if diff_days < 0 then
+                zero_jieqi = ' '
+            elseif diff_days == 0 then
+                -- 记录今天的节气
+                zero_jieqi = jieqi:match("^(%S+)")
+            elseif diff_days > 0 then
+                table.insert(upcoming_jqs, jieqi)
+            end
+        end
+
+        -- if zero_jieqi and zero_jieqi ~= '' then
+        -- -- if zero_jieqi then
+        --     -- 今天是节气时，取后两个节气
+        --     upcoming_jqs = {jqs[3], jqs[4]}
+        -- else
+        --     -- 今天不是节气，取前两个节气
+        --     upcoming_jqs = {jqs[2], jqs[3]}
+        -- end
+
+        -- 获取每个节气的距离天数
+        local jieqi_days = {}
+        for _, jieqi in ipairs(upcoming_jqs) do
+            table.insert(jieqi_days, days_until_jieqi(jieqi))
+        end
+        
+
+        -- --- 生成自定义长度的符号线 ---
+        local function generate_line(length)
+            -- return string.rep("—", length)
+            return string.rep("--", length)
+        end
+        -- 控制符号线的宽度为 15
+        local line = generate_line(0) 
+
+
+        -- ---〔 ⓿ 信息串 〕--- 
+        -- --- 生成最终信息字符串 ---
+        local summary = 
+            string.format("\n嗨，%s〔%s〕\n", greeting, os.date('%H点%M分%S秒', now)) .. 
+            string.format("%d年%02d月%02d日（第 %d 周）%s\n", year, month, day, week_of_year, week_day_str) ..
+            string.format("%d年已过 %d 天(%s)，共 %d 天\n", year, day_of_year - 1, year_progress_text, days_in_year) ..
+            string.format("农历：%s %s\n", lunar_info_str, zero_jieqi) ..
+            string.format("%d年剩余 %d 天｜农历新年 %d 天\n", next_year, diff_days_next_year, diff_days_lunar_new_year) ..
+            string.format("▸ %s %s \t< [ %02d ]天\n", holiday_data[1][1], holiday_data[1][2], holiday_data[1][3]) ..
+            string.format("▸ %s %s \t< [ %02d ]天\n", holiday_data[2][1], holiday_data[2][2], holiday_data[2][3]) .. 
+            string.format("▸ %s \t< [ %02d ]天\n", upcoming_jqs[1], jieqi_days[1]) ..
+            string.format("▸ %s \t< [ %02d ]天\n", upcoming_jqs[2], jieqi_days[2]) .. 
+            ''
+
+        -- 使用 generate_candidates 函数生成候选项
+        local candidates = { 
+            -- {summary, "日期信息整合"}
+            {summary, ""}
+        }
+
+        generate_candidates("day_summary", seg, candidates)
+    end
+end
+
+-- === 辅助函数说明 ===
+-- 本文件新增的快捷键功能：
+-- /jq  - 显示二十四节气信息
+-- /gz  - 显示干支历信息  
+-- /date - 显示农历日期转换信息
+-- /jc  - 显示完整的日程信息（原有功能）
+
+-- 所有功能都依赖 lunar.lua 中的函数：
+-- GetNowTimeJq() - 获取节气信息
+-- lunarJzl() - 获取干支信息
+-- Date2LunarDate() - 公历转农历
+-- LunarDate2Date() - 农历转公历
+-- days_until() - 计算日期差
+-- generate_candidates() - 生成候选词
+
+return schedule

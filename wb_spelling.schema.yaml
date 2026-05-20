@@ -1,0 +1,19 @@
+# encoding: utf-8
+# author: Shawx、Liuyt151
+# date: 2025-12-08
+# update_time: "2026-05-20"
+# description: 仅辅助于五笔显示注释字根
+# 修改过部分简码。
+# 修改字根显示无需特定字体。
+schema:
+  schema_id: wb_spelling
+  name: "流萤字根"
+  version: "2.0"
+  author:
+    - 网络文件整合版
+  description: |
+    伪方案，请勿编辑!!!
+    仅用于辅助三重注解方案实现注解功能。
+
+translator:
+  dictionary: wb_spelling

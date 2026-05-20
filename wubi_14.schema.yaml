@@ -1,0 +1,148 @@
+# ===================================================
+# 拇指布局输入方案 (14键布局优化版)
+# author: Liuyt151
+# date: 2026-05-15
+# ===================================================
+# 特性：
+#   - 自动继承主方案所有功能
+#   - 专为拇指输入优化添加 14 键位映射（w→q, r→e... ）
+#   - 提高拇指输入效率
+#   - 配合14键专用音辅版字典可有效降低重码。
+# ===================================================
+
+# 🔁 继承基础方案
+__include: wubi.schema:/
+
+schema:
+  schema_id: &schema wubi_14
+  name: "拇指五笔"
+  # 作者信息列表
+  author:
+    - Liuyt151
+    - https://github.com/liuyt151/TouchWubi
+  description: |
+    流萤
+      流光一瞬，不羡永恒。
+      萤火虽微，自照前程。
+# 功能开关列表配置
+switches:
+  # 开关1：编码（五笔码）显示控制
+  - name: new_hide_code
+    reset: 1                # 默认值为0（显示字型编码）
+    states: [ 显码, 隐码 ]
+    comment: "显示/隐藏五笔字型编码（单字）"
+
+  # 开关2：字根（部件拆分）显示控制
+  - name: new_spelling
+    reset: 0                # 默认值为1（显示部件拆分）
+    states: [ 隐根, 显根 ]
+    comment: "显示/隐藏汉字部件拆分（字根）"
+
+  # 开关3：单字拼音显示控制
+  - name: new_hide_pinyin
+    reset: 1                # 默认值为0（显示带声调拼音）
+    states: [ 显拼, 隐拼 ]
+    comment: "显示/隐藏单字带声调拼音"
+
+  # 开关4：配对标点控制（pair_symbol）
+  - name: pair_symbol
+    reset: 0                # 默认值为0（关闭配对）
+    states: [ "关配", "开配" ]
+    comment: "配对标点（括号、引号等自动成对）"
+
+  # 开关5：超级提示控制（super_tips）
+  - name: super_tips
+    reset: 0                # 默认值为0（关闭提示）
+    states: [ 关提, 开提 ]
+    comment: "超级提示"
+
+  # 开关6：中英转换控制（ce_trans）
+  - name: ce_trans
+    reset: 0                # 默认值为0（翻译关闭）
+    states: [ 关译, 开译 ]
+    comment: "中英文互译"
+
+  # 开关7：字符集控制（GB2312）
+  - name: GB2312
+    reset: 1                # 默认值为0（扩展字符集）
+    states: [ 扩展, 常用 ]
+    comment: "常用字符集（GB2312）过滤"
+
+  # 开关8：Emoji表情显示控制（show_es）
+  - name: show_es
+    reset: 0                # 默认值为0（隐藏表情）
+    states: [ 隐表, 显表 ]
+    comment: "Emoji 表情"
+
+  # 开关9：简繁转换控制（zh_trad）
+  - name: zh_trad
+    reset: 0                # 默认值为0（简体）
+    states: [ 简体, 繁体 ]
+    comment: "简繁转换"
+
+  # 开关10：标点符号全半角控制（ascii_punct）
+  - name: ascii_punct
+    reset: 0                # 默认值为0（全角标点）
+    states: [ 。，,．， ]
+    comment: "标点符号全角/半角"
+
+  # 开关11：半/全角转换控制（full_shape）
+  - name: full_shape
+    reset: 0                # 默认值为0（半角字符）
+    states: [ 半角, 全角 ]
+    comment: "字符全角/半角"
+
+engine:
+  translators/+:
+    - lua_translator@*email_suffix_translator  # 显示常用邮箱后缀
+    - lua_translator@*input_statistics         # 输入统计（/tj 等）
+# ========================================
+# ⌨️ 拼写规则配置（Speller）
+# ========================================
+speller/+:
+  # 字母表：定义可用的字母字符（按字母逆序排列，包含反引号用于自造词）
+  alphabet: zyxwvutsrqponmlkjihgfedcba`/@=
+  # 首字母：定义可作为首字母的字符
+  initials: zyxwvutsrqponmlkjihgfedcba`/@=
+  # 自动上屏规则：5码自动上屏（音辅码），4码不上屏等待筛选
+  auto_select_pattern: ^;.$|^\w{5}$
+  # 启用编码补全：允许4码匹配5码前缀
+  enable_completion: true
+  algebra/+:                               # algebra: 音节/编码变换规则列表,使用 /+/ 表示“追加到原列表末尾”
+# ========================================
+# 🌟 通配符规则（用于模糊五笔输入）
+# ========================================
+    - "derive/^z$/*/"                      # 单独一个 z → 通配符 *
+    - "derive/^z(.*)$/$1/"                 # z+其他码 → 替换为剩余部分（实现模糊匹配）
+    # 14键映射规则
+    - derive/w/q/     # W 键 → 视为 Q 区（金）
+    - derive/r/e/     # R 键 → 视为 E 区（月）
+    - derive/y/t/     # Y 键 → 视为 T 区（禾）
+    - derive/i/u/     # I 键 → 视为 U 区（山）
+    - derive/p/o/     # P 键 → 视为 O 区（人）
+    - derive/s/a/     # S 键 → 视为 A 区（日）
+    - derive/f/d/     # F 键 → 视为 D 区（口）
+    - derive/h/g/     # H 键 → 视为 G 区（王）
+    - derive/k/j/     # K 键 → 视为 J 区（田）
+    - derive/c/x/     # C 键 → 视为 X 区（女）
+    - derive/b/v/     # B 键 → 视为 V 区（已）
+    - derive/m/n/     # M 键 → 视为 N 区（力）
+# ========================================
+# 📚 翻译器配置（Translators）
+# ========================================
+translator/+:
+  dictionary: wubi_14                       # 使用14键适配字典（带第5位音辅码）
+  prism: *schema                            # 使用的棱镜文件（用于用户词典学习）
+  enable_user_dict: true                    # 启用用户词典学习
+  encode_commit_history: true               # 编码提交历史（学习用户习惯）
+  enable_encoder: true                      # 启用编码器（自动生成词组）
+  max_phrase_length: 4                      # 最大词组长度
+  initial_quality: 500                      # 初始质量值（确保基础优先级）
+  enable_completion: true                   # 启用编码补全：允许4码匹配5码前缀
+  enable_sentence: false                    # 禁用句子输入（14键不需要）
+# ========================================
+# 🔍 识别器增强：支持短码快速上屏
+# ========================================
+recognizer/+:
+  patterns/+:
+    short_code: "^[a-z]{1,3}$"              # 14键特有短码识别
