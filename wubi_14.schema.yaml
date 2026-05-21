@@ -16,7 +16,7 @@ __include: wubi.schema:/
 schema:
   schema_id: &schema wubi_14
   name: "拇指五笔"
-  # 作者信息列表
+
   author:
     - Liuyt151
     - https://github.com/liuyt151/TouchWubi

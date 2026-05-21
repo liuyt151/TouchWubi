@@ -15,8 +15,8 @@ __include: wubi_pinyin_mix.schema:/
 
 schema:
   schema_id: &schema wubi_pinyin_mix_14
-  name: "拇指笔音"
-  # 作者信息列表
+  name: "拇指双混"
+
   author:
     - Liuyt151
     - https://github.com/liuyt151/TouchWubi

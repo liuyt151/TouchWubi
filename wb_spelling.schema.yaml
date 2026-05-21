@@ -10,7 +10,7 @@ schema:
   name: "流萤字根"
   version: "2.0"
   author:
-    - 网络文件整合版
+    - 网络资料整合版
   description: |
     伪方案，请勿编辑!!!
     仅用于辅助三重注解方案实现注解功能。

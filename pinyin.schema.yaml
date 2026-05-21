@@ -12,6 +12,7 @@ schema:
   ascii_icon: "icons/EN.ico"
   full_icon: "icons/full.ico"
   half_icon: "icons/half.ico"
+
   author:
     - Liuyt151
     - https://github.com/liuyt151/TouchWubi

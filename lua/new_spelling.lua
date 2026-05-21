@@ -1,4 +1,4 @@
-﻿--[[
+--[[
     统一拆分模块 - 整合版（自动适配纯五笔 / 五笔拼音混输）
     功能：提供汉字字根拆分、拼音、编码等注解功能
     作者: 空山明月、shawx、Liuyt151
@@ -402,7 +402,7 @@ local function filter(input, env)
         end
     -- 隐根模式（spelling_states = false）时的处理
     else
-        -- z键引导的查询（隐根模式下仍可显示拼音/编码）
+        -- z键引导的查询（隐根模式下强制显示完整三重注解：字根+编码+拼音）
         if script_text:find("^z") then
             for cand in input:iter() do
                 if pass_gb2312_filter(cand, env) then
@@ -437,23 +437,20 @@ local function filter(input, env)
                         end
                         yield(cand)
                     else
-                        local parts = {}
-                        -- 显拼
-                        if not hide_pinyin and utf8.len(cand.text) == 1 then
-                            local code_comment = env.code_rvdb:lookup(cand.text)
-                            if code_comment ~= "" then
-                                table.insert(parts, xform(code_comment:gsub('%[(.-),(.-),(.-),(.-)%]', '[%3]')))
+                        -- z键反查：强制显示完整三重注解（字根+编码+拼音），方便学习
+                        local code_comment = env.code_rvdb:lookup(cand.text)
+                        if code_comment ~= "" and utf8.len(cand.text) == 1 then
+                            -- 单字：显示字根 · 编码 · 拼音
+                            cand.comment = xform(code_comment:gsub('%[(.-),(.-),(.-),(.-)%]', '[%1'..' · '..'%2'..' · '..'%3]'))
+                        elseif code_comment ~= "" and utf8.len(cand.text) > 1 then
+                            -- 词组：显示字根拆分
+                            local phrase_spelling = spell_phrase(cand.text, env.spll_rvdb)
+                            if phrase_spelling ~= '' then
+                                phrase_spelling = phrase_spelling:gsub('{(.-)}', '<%1>')
+                                cand.comment = '〈 ' .. phrase_spelling .. ' 〉'
+                            else
+                                cand.comment = ""
                             end
-                        end
-                        -- 显码
-                        if not hide_code and utf8.len(cand.text) == 1 then
-                            local code_comment = env.code_rvdb:lookup(cand.text)
-                            if code_comment ~= "" then
-                                table.insert(parts, xform(code_comment:gsub('%[(.-),(.-),(.-),(.-)%]', '[%2]')))
-                            end
-                        end
-                        if #parts > 0 then
-                            cand.comment = table.concat(parts, ' · ')
                         else
                             cand.comment = ""
                         end

@@ -8,7 +8,7 @@ schema:
   # 唯一标识符，用于区分不同的方案
   schema_id: wubi_pinyin_mix
   # 方案显示名称
-  name: "笔音双混"
+  name: "流萤双混"
   # 版本号
   version: "v2.0"
   # 中文状态图标文件路径
@@ -19,7 +19,7 @@ schema:
   full_icon: "icons/full.ico"
   # 半角状态图标文件路径
   half_icon: "icons/half.ico"
-  # 作者信息列表
+
   author:
     - Liuyt151
     - https://github.com/liuyt151/TouchWubi

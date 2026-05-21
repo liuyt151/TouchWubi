@@ -6,11 +6,11 @@
 config_version: '2.3'                                  # 指定使用的 Rime 配置语法版本，注意这个不能删除
 
 schema_list:                                           # 定义可用的输入方案列表
-  - {schema: wubi}                                     # 方案1：五笔输入法
-  - {schema: wubi_14}                                  # 方案2：拇指五笔输入法
-  - {schema: wubi_pinyin_mix}                          # 方案3：五笔拼音混合输入法
-  - {schema: wubi_pinyin_mix_14}                       # 方案4：拇指五笔拼音混合输入法
-  - {schema: wb_spelling}                              # 方案5：五笔字型（自定义字根方案）
+  - {schema: wubi}                                     # 方案1：流萤五笔
+  - {schema: wubi_14}                                  # 方案2：拇指五笔
+  - {schema: wubi_pinyin_mix}                          # 方案3：流萤双混
+  - {schema: wubi_pinyin_mix_14}                       # 方案4：拇指双混
+  - {schema: wb_spelling}                              # 方案5：三重注解伪方案
 
 switcher:                                              # 方案切换设置
   caption: 【输入法设置】                              # 切换菜单的标题
