@@ -14,9 +14,9 @@
 --   💾 自动保存统计数据，重启后不丢失（按方案分开存储）
 --   📈 自动保存昨日统计数据，方便与昨日进行对比
 --   ⏱️ 临时统计功能，可记录特定时间段输入情况
---   ⚡ 极速基于最近10秒瞬时速度（字/分）
---   📊 均速基于总字数/总连续输入时间（字/分）
---   🔄 5秒间隙自动切断连续输入段，统计真实净速度
+--   ⚡ 极速基于60秒滑动窗口（当日任意连续60秒内最多字数）
+--   📊 均速基于总字数/总连续输入时间（字/分），仅统计持续≥3秒的段
+--   🔄 10秒间隙自动切断连续输入段，统计真实净速度
 --   💾 保存前自动备份（.bak文件）
 --
 -- 配置方法：在方案文件中添加以下字段
@@ -34,7 +34,8 @@ local input_stats = input_stats or {
     daily_max = 0,
     weekly_max = 0,
     recent = {},          -- 用于临时统计的最快一分钟，主统计不再使用
-    yesterday = {count = 0, length = 0, fastest = 0, ts = 0}
+    yesterday = {count = 0, length = 0, fastest = 0, ts = 0},
+    commitLog = {}        -- 每次上屏记录 {ts=时间戳, len=字数}，用于60秒滑动窗口极速计算
 }
 
 -- 连续输入段追踪（全局，跨方案共享）
@@ -43,7 +44,7 @@ avgSpdInfo = avgSpdInfo or {
     startTime = 0,        -- 当前段起始时间
     clickTime = 0,        -- 最后一次按键时间
     commitTime = 0,       -- 当前段最后一次上屏时间
-    gapThd = 5,           -- 间隙阈值（秒）
+    gapThd = 10,          -- 间隙阈值（秒）
     count = 0             -- 当前段累计字数
 }
 
@@ -148,35 +149,48 @@ local function table_sum(tb)
     return sum
 end
 
--- 计算均速（字/分）
+-- 计算均速（字/分）：只统计持续≥3秒的输入段，排除零碎敲击
 local function calculate_avg_speed(stat)
-    local total_gaps = table_sum(stat.avgGaps)
-    local total_cnts = table_sum(stat.avgCnts)
+    local total_gaps = 0
+    local total_cnts = 0
+    for i = 1, #stat.avgGaps do
+        local gap = stat.avgGaps[i] or 0
+        local cnt = stat.avgCnts[i] or 0
+        if gap >= 3 then  -- 只统计持续≥3秒的输入段
+            total_gaps = total_gaps + gap
+            total_cnts = total_cnts + cnt
+        end
+    end
     if total_gaps > 0 then
         return total_cnts / total_gaps * 60
     end
     return 0
 end
 
--- 更新极速（基于最近10秒瞬时速度）
+-- 更新极速（基于60秒滑动窗口：当日任意连续60秒内最多字数）
 local function update_fastest(stat)
-    local total_gaps = 0
-    local total_cnts = 0
-    local len = #stat.avgGaps
-    for i = 0, len - 1 do
-        local gap = stat.avgGaps[len - i] or 0
-        local cnt = stat.avgCnts[len - i] or 0
-        total_gaps = total_gaps + gap
-        total_cnts = total_cnts + cnt
-        if total_gaps >= 10 then
-            break
+    local log = input_stats.commitLog
+    if not log or #log == 0 then return end
+
+    local len = #log
+    local max_count = 0
+    local window_sum = 0
+    local left = 1
+
+    -- 滑动窗口：右端逐个遍历，左端右移保证窗口内时间差 ≤ 60秒
+    for right = 1, len do
+        window_sum = window_sum + (log[right].len or 0)
+        while left <= right and (log[right].ts - log[left].ts) > 60 do
+            window_sum = window_sum - (log[left].len or 0)
+            left = left + 1
+        end
+        if window_sum > max_count then
+            max_count = window_sum
         end
     end
-    if total_gaps >= 10 then
-        local spd = total_cnts / total_gaps * 60
-        if spd > (stat.fastest or 0) then
-            stat.fastest = spd
-        end
+
+    if max_count > (stat.fastest or 0) then
+        stat.fastest = max_count
     end
 end
 
@@ -212,9 +226,18 @@ local function update_stats(input_length, is_segment_end, env)
 
     -- 周期重置逻辑
     if input_stats.daily.ts ~= day_ts then
+        -- 每日重置前：将当日极速同步到周/月/年（取最大值）
+        local daily_fastest = input_stats.daily.fastest or 0
+        if daily_fastest > 0 then
+            for _, period in ipairs({"weekly", "monthly", "yearly"}) do
+                if not input_stats[period] then break end
+                input_stats[period].fastest = math.max(input_stats[period].fastest or 0, daily_fastest)
+            end
+        end
         input_stats.daily = {count = 0, length = 0, fastest = 0, ts = day_ts, avgGaps = {}, avgCnts = {}}
         input_stats.daily_max = 0
         input_stats.recent = {}
+        input_stats.commitLog = {}  -- 新的一天，清空上屏记录
         -- 检测到新的一天，立即保存到文件（确保昨日数据持久化）
         if env and env.engine and env.engine.schema then
             save_stats(env.engine.schema.schema_id)
@@ -245,13 +268,13 @@ local function update_stats(input_length, is_segment_end, env)
             local function add_to_stat(stat)
                 table.insert(stat.avgGaps, delt)
                 table.insert(stat.avgCnts, avgSpdInfo.count)
-                -- 更新极速（基于最近10秒）
-                update_fastest(stat)
             end
             add_to_stat(input_stats.daily)
             add_to_stat(input_stats.weekly)
             add_to_stat(input_stats.monthly)
             add_to_stat(input_stats.yearly)
+            -- 段结束时更新极速（基于60秒滑动窗口）
+            update_fastest(input_stats.daily)
         end
     end
 
@@ -265,6 +288,10 @@ local function update_stats(input_length, is_segment_end, env)
         add(input_stats.weekly)
         add(input_stats.monthly)
         add(input_stats.yearly)
+
+        -- 记录每次上屏到 commitLog（用于极速60秒滑动窗口计算）
+        input_stats.commitLog = input_stats.commitLog or {}
+        table.insert(input_stats.commitLog, {ts = os.time(), len = input_length})
 
         if input_length > (input_stats.daily_max or 0) then
             input_stats.daily_max = input_length
@@ -364,6 +391,7 @@ local function load_stats_from_lua_file(schema_id)
         input_stats.yesterday = input_stats.yesterday or {count = 0, length = 0, fastest = 0, ts = 0}
         input_stats.daily_max = input_stats.daily_max or 0
         input_stats.weekly_max = input_stats.weekly_max or 0
+        input_stats.commitLog = input_stats.commitLog or {}
     else
         -- 初始化空表
         input_stats = {
@@ -375,7 +403,8 @@ local function load_stats_from_lua_file(schema_id)
             daily_max = 0,
             weekly_max = 0,
             recent = {},
-            yesterday = {count = 0, length = 0, fastest = 0, ts = 0}
+            yesterday = {count = 0, length = 0, fastest = 0, ts = 0},
+            commitLog = {}
         }
     end
 end
@@ -426,8 +455,7 @@ local function format_daily_summary(schema_name)
     end
     
     local avg_speed = calculate_avg_speed(s)
-    local fastest = s.fastest or 0
-    if avg_speed > fastest then fastest = avg_speed end  -- 预防空数据
+    local fastest = math.floor(s.fastest or 0)  -- 极速为60秒内最多字数（整数）
     
     -- 计算与昨日的对比
     local comparison_text = ""
@@ -453,7 +481,7 @@ local function format_daily_summary(schema_name)
         "%s\n"..
         "共上屏[%d]次\n"..
         "共输入[%d]字\n"..
-        "极速[%.1f]字/分\n"..
+        "极速[%d]字/分钟\n"..
         "均速[%.1f]字/分\n"..
         "%s\n"..
         "%s\n"..
@@ -477,15 +505,14 @@ local function format_weekly_summary(schema_name)
     end
     
     local avg_speed = calculate_avg_speed(s)
-    local fastest = s.fastest or 0
-    if avg_speed > fastest then fastest = avg_speed end
+    local fastest = math.floor(s.fastest or 0)
     
     return string.format(
         "◉ 本周统计\n"..
         "%s\n"..
         "共上屏[%d]次\n"..
         "共输入[%d]字\n"..
-        "极速[%.1f]字/分\n"..
+        "极速[%d]字/分钟\n"..
         "均速[%.1f]字/分\n"..
         "周内单日最多一次输入[%d]字\n"..
         "%s\n"..
@@ -509,15 +536,14 @@ local function format_monthly_summary(schema_name)
     end
     
     local avg_speed = calculate_avg_speed(s)
-    local fastest = s.fastest or 0
-    if avg_speed > fastest then fastest = avg_speed end
+    local fastest = math.floor(s.fastest or 0)
     
     return string.format(
         "◉ 本月统计\n"..
         "%s\n"..
         "共上屏[%d]次\n"..
         "共输入[%d]字\n"..
-        "极速[%.1f]字/分\n"..
+        "极速[%d]字/分钟\n"..
         "均速[%.1f]字/分\n"..
         "月内单周最多一次输入[%d]字\n"..
         "%s\n"..
@@ -541,8 +567,7 @@ local function format_yearly_summary(schema_name)
     end
     
     local avg_speed = calculate_avg_speed(s)
-    local fastest = s.fastest or 0
-    if avg_speed > fastest then fastest = avg_speed end
+    local fastest = math.floor(s.fastest or 0)
     
     local fav = 0
     if input_stats.lengths then
@@ -561,7 +586,7 @@ local function format_yearly_summary(schema_name)
         "%s\n"..
         "共上屏[%d]次\n"..
         "共输入[%d]字\n"..
-        "极速[%.1f]字/分\n"..
+        "极速[%d]字/分钟\n"..
         "均速[%.1f]字/分\n"..
         "您最常输入长度为[%d]的词组\n"..
         "%s\n"..
@@ -615,7 +640,8 @@ local function translator(input, seg, env)
             daily_max = 0,
             weekly_max = 0,
             recent = {},
-            yesterday = yesterday_data
+            yesterday = yesterday_data,
+            commitLog = {}
         }
         save_stats(env.engine.schema.schema_id)
         summary = "※ 所有统计数据已清空（昨日数据保留）。"
