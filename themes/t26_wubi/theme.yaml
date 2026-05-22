@@ -179,9 +179,7 @@ preset_keyboards:
   # 默认菜单 - 显示在输入法底部的快捷工具栏
     menu: { events: [
      eisu_toggle_emoji,                             # 表情
-     eisu_toggle_custom_phrase_board,               # 常用语
      eisu_toggle_clip_board,                        # 打开剪切板
-     eisu_toggle_更多_dotSymbols,                   # 更多符号
      eisu_toggle_schema_board,                      # 键盘方案选择
      function_rime_switcher                         # Rime输入法切换器
     ] }
@@ -330,9 +328,7 @@ preset_keyboards:
     key_down_text_offset_y: 1            #下标符号文本y轴-1、-2、-3上偏移
     menu: { events: [
      eisu_toggle_emoji,                             # 表情
-     eisu_toggle_custom_phrase_board,               # 常用语
      eisu_toggle_clip_board,                        # 打开剪切板
-     eisu_toggle_更多_dotSymbols,                   # 更多符号
      eisu_toggle_schema_board,                      # 键盘方案选择
      function_rime_switcher                         # Rime输入法切换器
     ] }
@@ -471,9 +467,7 @@ preset_keyboards:
     # width: 22
     menu: { events: [
      eisu_toggle_emoji,                             # 表情
-     eisu_toggle_custom_phrase_board,               # 常用语
      eisu_toggle_clip_board,                        # 打开剪切板
-     eisu_toggle_更多_dotSymbols,                   # 更多符号
      eisu_toggle_schema_board,                      # 键盘方案选择
      function_rime_switcher                         # Rime输入法切换器
     ] }
@@ -577,9 +571,7 @@ preset_keyboards:
     vertical_gap: 7                      # 按键之间的垂直间距（单位：dp，竖屏有效）
     menu: { events: [
      eisu_toggle_emoji,                             # 表情
-     eisu_toggle_custom_phrase_board,               # 常用语
      eisu_toggle_clip_board,                        # 打开剪切板
-     eisu_toggle_更多_dotSymbols,                   # 更多符号
      eisu_toggle_schema_board,                      # 键盘方案选择
      function_rime_switcher                         # Rime输入法切换器
     ] }

@@ -1,6 +1,23 @@
 ---@diagnostic disable: undefined-global
 
 -- 万象的一些共用工具函数
+-- 【方案配置说明】
+-- 本脚本为工具库，不直接在方案中配置，被其他 Lua 脚本引用：
+--
+-- 引用方式：
+--   local wanxiang = require("wanxiang")
+--
+-- 主要功能：
+--   - wanxiang.is_mobile_device()           -- 判断是否为移动设备
+--   - wanxiang.is_pro_scheme(env)           -- 判断是否为专业版方案
+--   - wanxiang.is_in_radical_mode(env)      -- 判断是否处于反查模式
+--   - wanxiang.is_function_mode_active(ctx) -- 判断是否处于功能模式
+--   - wanxiang.get_filename_with_fallback() -- 按优先级获取文件路径
+--   - wanxiang.get_user_id()                -- 获取用户ID
+--   - wanxiang.get_input_method_type(env)   -- 获取输入法类型
+--
+-- 无需在 schema.yaml 中配置，无需识别器
+
 local wanxiang = {}
 
 -- x-release-please-start-version

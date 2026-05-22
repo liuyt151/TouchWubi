@@ -2,6 +2,27 @@
 -- 功能：合并OpenCC拆分的翻译候选项，使翻译结果在一行完整显示
 -- 作者：Shaw
 -- 日期：2025-01-13
+--
+-- 【方案配置说明】
+-- 本脚本为过滤器，需在 schema.yaml 中添加以下配置：
+--
+-- engine:
+--   filters:
+--     - lua_filter@*translate_merge           # 翻译合并过滤器
+--
+-- switches:                                    # 添加开关控制
+--   - name: ce_trans
+--     reset: 0
+--     states: [ 关译, 开译 ]
+--
+-- 建议配置位置：在 simplifier@ce_en_conversion 之后，uniquifier 之前
+--
+-- 依赖文件：
+--   - opencc/ce.json                          # 中英转换配置
+--   - opencc/chinese_english.txt              # 中英字典
+--   - opencc/english_chinese.txt              # 英中字典
+--
+-- 无需识别器配置，脚本通过 context:get_option("ce_trans") 开关控制
 
 -- 【内存优化】记录开关状态，避免重复检查
 local last_ce_trans_state = nil

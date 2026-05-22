@@ -12,6 +12,24 @@
 -- =map(range(-5,5),\x.x*pi/4|,deriv(sin)) 輸出 {-0.7071, -1, -0.7071, 0, 0.7071, 1, 0.7071, 0, -0.7071, -1}
 -- =$(range(-5,5,0.01))(map,\x.-60*x^2-16*x+20|)(max)() 輸出 21.066
 -- =test(\x.trunc(sin(x),1e-3)==trunc(deriv(cos)(x),1e-3)|,range(-2,2,0.1)) 輸出 true
+--
+-- 【方案配置说明】
+-- 本脚本为翻译器，需在 schema.yaml 中添加以下配置：
+--
+-- engine:
+--   translators:
+--     - lua_translator@*calculator          # 计算器翻译器
+--
+-- speller:                                     # 必须配置引导符
+--   alphabet: zyxwvutsrqponmlkjihgfedcba`/@=  # 必须包含 =（等号）
+--   initials: zyxwvutsrqponmlkjihgfedcba`/@=  # 必须包含 =（等号）
+--
+-- 可选识别器配置（用于 matcher 优化调度，非必须）：
+-- recognizer:
+--   patterns:
+--     expression: "^=.*$"                   # 表达式模式（可选）
+--
+-- 脚本内部通过 string.sub(input, 1, 1) == "=" 判断，无需识别器也能工作
 
 -- 完整的数学函数库（安全环境管理）
 local full_math_env = {

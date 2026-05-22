@@ -5,6 +5,27 @@
 -- ctrl/l 重置
 -- ctrl+p 置顶
 -- /txql 清除所有调序记录
+--
+-- 【方案配置说明】
+-- 本脚本包含处理器(P)和过滤器(F)，需在 schema.yaml 中添加以下配置：
+--
+-- engine:
+--   processors:
+--     - lua_processor@*super_sequence*P       # 超序列处理器（处理 Ctrl+J/K/L/P）
+--   filters:
+--     - lua_filter@*super_sequence*F          # 超序列过滤器（调整候选项顺序）
+--
+-- key_binder:                                  # 按键绑定配置（可选，默认使用 Ctrl+J/K/L/P）
+--   sequence:
+--     up: "Control+j"                         # 前移
+--     down: "Control+k"                       # 后移
+--     reset: "Control+l"                      # 重置
+--     pin: "Control+p"                        # 置顶
+--
+-- 无需识别器配置，脚本通过以下方式判断：
+--   - 检测 Ctrl 键组合（key_event:ctrl()）
+--   - is_function_mode_active() 排除功能模式
+--   - 输入 "/txql" 触发清空数据库
 
 -- 内部常量定义（从 wanxiang.lua 提取）
 local RIME_PROCESS_RESULTS = {

@@ -5,12 +5,27 @@
     优化日期: 2026-05-20 - 修复退格键触发自动上屏的问题
     问题：按下退格键时，context.input 尚未删除最后一个编码，仍为四码，
          导致错误执行自动上屏。现增加按键过滤：退格键直接放行。
-    使用方法：
-    在 wubi_pinyin.schema.yaml 的 processors 中添加：
-    - lua_processor@*smart_commit
+
+    【方案配置说明】
+    本脚本为处理器，需在 schema.yaml 中添加以下配置：
+
+    engine:
+      processors:
+        - lua_processor@*smart_commit           # 智能上屏处理器
+
+    建议配置位置：在 ascii_composer 之后，recognizer 之前
+
+    speller:                                     # 可选配置
+      auto_select_pattern: ^;.$|^\w{4}$        # 四码自动上屏（由脚本补充）
+
+    无需识别器配置，脚本通过以下方式判断：
+      - 检测按键类型（只处理 a-z 字母键）
+      - 检测候选类型（table=五笔，reverse_lookup=拼音）
+      - 输入长度和正则匹配
+
     判断逻辑：
-    1. 五笔模式：输入长度=4，第一个候选是 table 类型（五笔字典匹配）（修改当前逻辑）
-    2. 拼音模式：候选来自 reverse_lookup 类型，或输入长度较长
+    1. 五笔模式：输入长度=4，第一个候选是 table 类型（五笔字典匹配）
+    2. 拼音模式：候选来自 reverse_lookup 类型，不自动上屏
 ]]
 
 local M = {}

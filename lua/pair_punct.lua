@@ -2,6 +2,24 @@
 -- author: kuroame, boomker, shawx
 -- license: MIT
 -- 雙符成形
+--
+-- 【方案配置说明】
+-- 本脚本包含处理器和分段器，需在 schema.yaml 中添加以下配置：
+--
+-- engine:
+--   processors:
+--     - lua_processor@*pair_punct*processor   # 配对标点处理器
+--   segmentors:
+--     - lua_segmentor@*pair_punct*segmentor   # 配对标点分段器
+--
+-- switches:                                    # 添加开关控制
+--   - name: pair_symbol
+--     reset: 0
+--     states: [ "关配", "开配" ]
+--
+-- 无需识别器配置，脚本通过符号白名单和配对表判断：
+--   - pairTable 定义了所有支持配对的符号
+--   - is_pure_symbol() 函数检查候选是否为配对符号
 
 local M = {}
 local processor = {}

@@ -3,6 +3,22 @@
 -- 作者：Shaw
 -- 日期：2025-01-13
 -- 优化：2025-01-16 添加缓存机制，避免每次都读取文件
+--
+-- 【方案配置说明】
+-- 本脚本为翻译器，需在 schema.yaml 中添加以下配置：
+--
+-- engine:
+--   translators:
+--     - lua_translator@*english_translator    # 英文翻译器
+--
+-- switches:                                    # 添加开关控制
+--   - name: ce_trans
+--     reset: 0
+--     states: [ 关译, 开译 ]
+--
+-- 无需识别器配置，脚本通过以下方式判断：
+--   - _G.ce_translation_enabled 全局开关控制
+--   - input:match("^[a-zA-Z]+$") 正则匹配纯英文输入
 
 -- 全局字典缓存（使用 _G 使其可被其他模块访问）
 local dict_cache = nil

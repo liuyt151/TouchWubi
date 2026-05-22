@@ -1,9 +1,29 @@
+-- lunar.lua
+-- 农历节气计算库
 -- Modified by ksqsf for Project Moran
--- AMZ 万象新增节日候选,格式化问候语,重写农历倒计时 
+-- AMZ 万象新增节日候选,格式化问候语,重写农历倒计时
 -- Simplified by Jack Liu <https://aituyaa.com>
 ------------------------------------
 ------wirting by 98wubi Group-------
 ------http://98wb.ys168.com/--------
+--
+-- 【方案配置说明】
+-- 本脚本为工具库，不直接在方案中配置，被其他 Lua 脚本引用：
+--
+-- 引用方式：
+--   require("lib/lunar")
+--
+-- 主要功能：
+--   - Date2LunarDate(date)                  -- 公历转农历
+--   - LunarDate2Date(date, leap)            -- 农历转公历
+--   - GetNowTimeJq(date)                    -- 获取当前时间节气
+--   - lunarJzl(datetime)                    -- 获取干支历
+--   - GetDaysToNextLunarNewYear(date)       -- 计算到下一个农历新年的天数
+--   - days_until(target_time)               -- 计算到目标日期的天数
+--   - get_upcoming_holidays()               -- 获取即将到来的节日
+--
+-- 无需在 schema.yaml 中配置，无需识别器
+-- 被 schedule.lua 引用
 
 
 -- === 农历节气计算部分 ===

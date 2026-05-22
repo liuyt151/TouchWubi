@@ -2,16 +2,25 @@
 -- 作者：Liuyt151
 -- 日期：2025-10-25
 -- 输入@后在候选栏进行常用邮箱后缀智能补全，快速完整的进行邮箱输入
--- 在方案文件中添加以下字段：
+--
+-- 【方案配置说明】
+-- 本脚本为翻译器，需在 schema.yaml 中添加以下配置：
 --
 -- engine:
 --   translators:
---     - lua_translator@*email_suffix_translator  # 添加邮箱后缀翻译器
-	
+--     - lua_translator@*email_suffix_translator  # 邮箱后缀翻译器
+--
+-- speller:                                        # 必须配置引导符
+--   alphabet: zyxwvutsrqponmlkjihgfedcba`/@=     # 必须包含 @（at符号）
+--   initials: zyxwvutsrqponmlkjihgfedcba`/@=     # 必须包含 @（at符号）
+--
+-- 可选识别器配置（用于 matcher 优化调度，非必须）：
 -- recognizer:
 --   patterns:
---     email: "^[A-Za-z][-_.0-9A-Za-z]*@.*$"  # 常用邮箱后缀识别模式
+--     email: "^[A-Za-z][-_.0-9A-Za-z]*@.*$"      # 邮箱识别模式（可选）
 --
+-- 脚本内部通过 input == "@" 或 string.sub(input, 1, 1) == "@" 判断，
+-- 无需识别器也能工作。识别器模式与脚本判断逻辑不完全相同，仅供参考。
 
 local function email_suffix_translator(input, seg)
     -- 纯@输入，显示所有常用邮箱

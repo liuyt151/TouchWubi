@@ -1,4 +1,19 @@
 ﻿-- basic.lua
+-- 基础工具函数库
+--
+-- 【方案配置说明】
+-- 本脚本为工具库，不直接在方案中配置，被其他 Lua 脚本引用：
+--
+-- 引用方式：
+--   local basic = require('lib/basic')
+--
+-- 主要功能：
+--   - basic.index(table, item)              -- 查找元素在表中的索引
+--   - basic.map(table, func)                -- 对表进行映射操作
+--   - basic.matchstr(str, pat)              -- 字符串匹配
+--   - basic.utf8chars(str)                  -- 将UTF-8字符串转为字符数组
+--
+-- 无需在 schema.yaml 中配置，无需识别器
 
 local basic = {}
 package.loaded[...] = basic

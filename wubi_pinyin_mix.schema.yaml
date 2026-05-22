@@ -225,9 +225,8 @@ translator:
   db_class: tabledb
   # 初始质量值：候选项的优先级权重（1000为最高优先级）
   initial_quality: 500
-  # 对特定模式禁用用户词典：以z开头的编码不记录到用户词典
+  # 对特定模式禁用用户词典：匹配以z开头的所有编码不记录到用户词典
   disable_user_dict_for_patterns:
-    # 匹配以z开头的所有编码
     - "^z.*$"
   # 是否启用字符集过滤器（false=不启用，支持GBK扩展字符）
   enable_charset_filter: false
@@ -300,14 +299,6 @@ recognizer:
   patterns:
     # 自造词模式：匹配`键引导的自造词输入（例如：aa`bb 表示两个字的自造词）
     mkst: "^[a-y]*`[a-y`]*$"
-    # 日程命令模式：匹配以 / 开头后跟 jc、jq、gz、date 的输入（支持所有快捷键）
-    schedule: "^/(jc|jq|gz|date)"
-    # 表达式模式：匹配以 = 开头的输入（计算器表达式）
-    expression: "^=.*$"
-    # 邮箱模式：匹配标准的邮箱格式
-    email: "^[A-Za-z][-_.0-9A-Za-z]*@.*$"
-    # URL模式：匹配各种网址格式（www、https、ftp、mailto、file等）
-    url: "^(www[.]|https?:|ftp[.:]|mailto:|file:).*$|^[a-z]+[.].+$"
     # 标点符号模式：匹配以/开头的数字或字母（用于调取symbol.yaml中的符号）
     punct: "^/([0-9]0?|[A-Za-z]+)$"
 

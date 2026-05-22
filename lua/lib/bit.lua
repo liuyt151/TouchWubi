@@ -1,3 +1,19 @@
+-- bit.lua
+-- 位运算兼容库（适配不同 Lua 版本）
+--
+-- 【方案配置说明】
+-- 本脚本为工具库，不直接在方案中配置，被其他 Lua 脚本引用：
+--
+-- 引用方式：
+--   local bit = require('lib/bit')
+--
+-- 主要功能：
+--   - bit.band(a, b)                        -- 按位与
+--   - bit.bxor(a, b)                        -- 按位异或
+--   - 自动适配 LuaJIT/Lua 5.2/Lua 5.3+
+--
+-- 无需在 schema.yaml 中配置，无需识别器
+
 local bit_ok, bit_ = pcall(require, "bit")       -- LuaJIT 内置 bit 库
 local bit32_ok, bit32_ = pcall(require, "bit32") -- Lua 5.2 内置 bit32 库
 

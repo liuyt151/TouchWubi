@@ -2,9 +2,30 @@
 -- 采用leveldb数据库,支持大数据遍历,支持多种类型混合,多种拼音编码混合,维护简单
 -- 支持候选匹配和编码匹配两种，候选支持方向键高亮遍历
 -- https://github.com/amzxyz/rime_wanxiang
---     - lua_processor@*super_tips
---     key_binder/tips_key: "slash" # 上屏按键配置
---     tips/disabled_types: [] # 禁用的 tips 类型
+--
+-- 【方案配置说明】
+-- 本脚本为处理器，需在 schema.yaml 中添加以下配置：
+--
+-- engine:
+--   processors:
+--     - lua_processor@*super_tips             # 超级提示处理器
+--
+-- switches:                                    # 添加开关控制
+--   - name: super_tips
+--     reset: 0
+--     states: [ 关提, 开提 ]
+--
+-- key_binder:                                  # 上屏按键配置
+--   tips_key: "slash"                         # 默认使用 / 键上屏
+--
+-- tips:                                        # 可选配置
+--   disabled_types: []                        # 禁用的 tips 类型
+--
+-- 数据文件：
+--   - lua/tips/tips_show.txt                  # 预设提示数据
+--   - lua/tips/tips_user.txt                  # 用户自定义提示（用户目录）
+--
+-- 无需识别器配置，脚本通过 context:get_option("super_tips") 开关控制
 local wanxiang = require("wanxiang")
 local bit = require("lib/bit")
 local userdb = require("lib/userdb")

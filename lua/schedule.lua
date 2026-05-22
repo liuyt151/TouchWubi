@@ -2,6 +2,29 @@
 -- Modified by ksqsf for Project Moran
 -- AMZ 万象新增节日候选,格式化问候语,重写农历倒计时
 -- Simplified by Jack Liu <https://aituyaa.com>
+--
+-- 【方案配置说明】
+-- 本脚本为翻译器，需在 schema.yaml 中添加以下配置：
+--
+-- engine:
+--   translators:
+--     - lua_translator@*schedule              # 日程翻译器
+--
+-- speller:                                     # 必须配置引导符
+--   alphabet: zyxwvutsrqponmlkjihgfedcba`/@=  # 必须包含 /（斜杠）
+--   initials: zyxwvutsrqponmlkjihgfedcba`/@=  # 必须包含 /（斜杠）
+--
+-- 可选识别器配置（用于 matcher 优化调度，非必须）：
+-- recognizer:
+--   patterns:
+--     schedule: "^/(jc|jq|gz|date)"           # 日程命令模式（可选）
+--
+-- 脚本内部通过输入字符串精确匹配判断：
+--   - "/jc" - 显示完整日程信息
+--   - "/jq" - 显示二十四节气
+--   - "/gz" - 显示干支历
+--   - "/date" - 显示农历日期转换
+--
 -- 生成日程表候选，如：
 --[[
     嗨，我是您的日程小助手，晚上好!  

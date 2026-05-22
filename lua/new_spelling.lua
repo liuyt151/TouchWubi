@@ -6,6 +6,36 @@
     优化日期: 2026-05-20
     用途: 独立的拆分过滤器模块，根据方案自动切换行为（纯五笔 or 混输）
     版本: 整合版 - 通过 schema 中的 mixed_input 标志自动适配
+
+    【方案配置说明】
+    本脚本为过滤器（含 init 初始化），需在 schema.yaml 中添加以下配置：
+
+    engine:
+      filters:
+        - lua_filter@*new_spelling              # 字根拆分过滤器
+
+    switches:                                    # 添加开关控制
+      - name: new_spelling
+        reset: 1
+        states: [ 隐根, 显根 ]
+      - name: new_hide_pinyin
+        reset: 0
+        states: [ 显拼, 隐拼 ]
+      - name: new_hide_code
+        reset: 0
+        states: [ 显码, 隐码 ]
+      - name: new_phrase_pinyin                 # 仅混输方案需要
+        reset: 0
+        states: [ 隐声, 显声 ]
+
+    engine:                                      # 混输方案需添加
+      mixed_input: true                          # 告诉脚本这是混输方案
+
+    lua_reverse_db:                              # 反向数据库配置
+      spelling: wb_spelling
+      code: wb_spelling
+
+    无需识别器配置，脚本通过 context:get_script_text() 和正则判断输入模式
 ]]
 
 -- =================================================================
@@ -363,16 +393,6 @@ local function filter(input, env)
                             else
                                 yield(cand)
                             end
-                        -- ~键引导的注音查询
-                        elseif script_text:find("^([%~])[a-z]*") and not script_text:find("%p$") and
-                               env.engine.context:get_option("rvl_zhuyin") then
-                            local code_comment = env.code_rvdb:lookup(cand.text)
-                            if code_comment ~= "" then
-                                code_comment = xform(code_comment:gsub('%[(.-),(.-),(.-),(.-)%]', '[%3'..' · '..'%1]'))
-                                yield(Candidate("rvl_zhuyin", cand.start, cand._end, cand.text, code_comment))
-                            else
-                                yield(cand)
-                            end
                         -- 其他普通输入
                         else
                             local add_comment = ''
@@ -455,21 +475,6 @@ local function filter(input, env)
                             cand.comment = ""
                         end
                         yield(cand)
-                    end
-                end
-            end
-        -- ~键引导的注音查询（隐根模式）
-        elseif script_text:find("^([%~])[a-z]*") and not script_text:find("%p$") and
-               env.engine.context:get_option("rvl_zhuyin") then
-            for cand in input:iter() do
-                if pass_gb2312_filter(cand, env) then
-                    local code_comment = env.code_rvdb:lookup(cand.text)
-                    if code_comment ~= "" then
-                        code_comment = xform(code_comment:gsub('%[(.-),(.-),(.-),(.-)%]', '%3')):gsub("^%s+",""):gsub("%s+$","")
-                        if code_comment:find("%s") then
-                            code_comment = code_comment:gsub("%s+"," · ")
-                        end
-                        yield(Candidate("zhuyin_rvlk", cand.start, cand._end, cand.text, " " .. code_comment))
                     end
                 end
             end

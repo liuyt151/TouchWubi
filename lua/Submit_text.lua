@@ -4,6 +4,24 @@
 --fix: 将用户输入的中文词条和对应的五笔编码追加记录到文件中的简单日志函数	
 --update: 2025-12-18 模块化重构，独立管理自造词路径
 --update: 2025-12-20 合并自造词翻译器，实现即时生效
+--
+-- 【方案配置说明】
+-- 本脚本包含处理器和翻译器两部分，需在 schema.yaml 中添加以下配置：
+--
+-- engine:
+--   processors:
+--     - lua_processor@*Submit_text          # 自造词记录处理器（必须）
+--   translators:
+--     - lua_translator@user_coined_translator # 自造词翻译器（必须，注意无*号）
+--
+-- speller:                                     # 必须配置引导符
+--   alphabet: zyxwvutsrqponmlkjihgfedcba`/@=  # 必须包含 `（反引号）
+--   initials: zyxwvutsrqponmlkjihgfedcba`/@=  # 必须包含 `（反引号）
+--   delimiter: "`"                            # 分隔符设为反引号
+--
+-- 无需识别器配置，脚本通过内部正则判断输入模式：
+--   - `aa`bb 格式识别为自造词输入
+--   - [ / ] \ 识别为标点选择
 --]
 local basic = require('lib/basic')
 local map = basic.map

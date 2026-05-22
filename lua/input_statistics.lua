@@ -19,11 +19,23 @@
 --   🔄 10秒间隙自动切断连续输入段，统计真实净速度
 --   💾 保存前自动备份（.bak文件）
 --
--- 配置方法：在方案文件中添加以下字段
+-- 【方案配置说明】
+-- 本脚本为翻译器（含 init 初始化），需在 schema.yaml 中添加以下配置：
+--
 -- engine:
 --   translators:
---     - lua_translator@*input_statistics
+--     - lua_translator@*input_statistics      # 输入统计翻译器
 --
+-- speller:                                     # 必须配置引导符
+--   alphabet: zyxwvutsrqponmlkjihgfedcba`/@=  # 必须包含 /（斜杠）
+--   initials: zyxwvutsrqponmlkjihgfedcba`/@=  # 必须包含 /（斜杠）
+--
+-- 无需识别器配置，脚本通过输入字符串精确匹配判断：
+--   - "/tj", "tjxs" - 显示统计
+--   - "/qk", "tjqk" - 清空统计
+--   - "/ks", "tjks" - 开始临时统计
+--   - "/js", "tjjs" - 结束临时统计
+--   - "/tc", "tjtc" - 退出临时统计
 
 local input_stats = input_stats or {
     daily = {count = 0, length = 0, fastest = 0, ts = 0, avgGaps = {}, avgCnts = {}},
