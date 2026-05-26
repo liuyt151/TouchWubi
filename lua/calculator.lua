@@ -43,6 +43,11 @@ local full_math_env = {
   rad = math.rad,
   deg = math.deg,
   
+  -- 双曲函数
+  sinh = math.sinh,
+  cosh = math.cosh,
+  tanh = math.tanh,
+  
   -- 基础数学
   abs = math.abs,
   floor = math.floor,
@@ -51,6 +56,8 @@ local full_math_env = {
   sqrt = math.sqrt,
   exp = math.exp,
   ln = math.log,
+  loge = math.log,  -- 自然对数别名
+  log10 = math.log10,
   random = math.random,
   randomseed = math.randomseed,
   
@@ -68,6 +75,12 @@ local full_math_env = {
     end
     return x - math.fmod(x, dc)
   end,
+  
+  -- atan2函数（返回点(x,y)相对于x轴的角度）
+  atan2 = math.atan2,
+  
+  -- ldexp函数（返回 x*2^y）
+  ldexp = math.ldexp,
   
   round = function (x, dc)
     dc = dc or 1
@@ -224,7 +237,7 @@ local full_math_env = {
     return cf
   end,
   
-  -- 统计算法
+  -- 阶乘（支持 n! 语法糖）
   fac = function (n)
     local acc = 1
     for i = 2,n do
@@ -232,6 +245,7 @@ local full_math_env = {
     end
     return acc
   end,
+  fact = function (n) return full_math_env.fac(n) end,
   
   nPr = function (n, r)
     return full_math_env.fac(n) / full_math_env.fac(n - r)
@@ -239,6 +253,28 @@ local full_math_env = {
   
   nCr = function (n, r)
     return full_math_env.nPr(n,r) / full_math_env.fac(r)
+  end,
+  
+  -- 方差计算
+  var = function (...)
+    local data = {...}
+    local n = select("#", ...)
+    if n == 0 then return nil end
+    
+    -- 计算均值
+    local sum = 0
+    for _, value in ipairs(data) do
+      sum = sum + value
+    end
+    local mean = sum / n
+    
+    -- 计算方差
+    local sum_squared_diff = 0
+    for _, value in ipairs(data) do
+      sum_squared_diff = sum_squared_diff + (value - mean)^2
+    end
+    
+    return sum_squared_diff / n
   end,
   
   MSE = function (t)
@@ -545,6 +581,8 @@ local function calculator(input, seg)
       expe, count = expe:gsub("\\%s*([%a%d%s,_]-)%s*%.(.-)|", " (function (%1) return %2 end) ")
     until count == 0
   end
+  -- 阶乘语法糖：数字! → fact(数字)
+  expe = expe:gsub('([0-9]+)!', 'fact(%1)')
 
   -- 安全检查：防止危险操作
   if expe:find("i?os?%.") or expe:find("io%.") then return end

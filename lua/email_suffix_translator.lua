@@ -1,6 +1,6 @@
--- 增强版邮箱后缀翻译器
+-- 增强版邮箱后缀翻译器（修复模糊匹配 + 性能优化）
 -- 作者：Liuyt151
--- 日期：2025-10-25
+-- 日期：2025-10-25（修订：2026-05-24）
 -- 输入@后在候选栏进行常用邮箱后缀智能补全，快速完整的进行邮箱输入
 --
 -- 【方案配置说明】
@@ -22,73 +22,68 @@
 -- 脚本内部通过 input == "@" 或 string.sub(input, 1, 1) == "@" 判断，
 -- 无需识别器也能工作。识别器模式与脚本判断逻辑不完全相同，仅供参考。
 
+local all_domains = {
+    "gmail.com", "qq.com", "163.com", "126.com", "sina.com",
+    "sohu.com", "outlook.com", "hotmail.com", "yahoo.com",
+    "foxmail.com", "aliyun.com", "139.com", "189.cn", "yeah.net",
+    "live.com", "icloud.com", "msn.com", "aol.com", "mail.com",
+    "tom.com", "21cn.com", "188.com", "wo.cn", "vip.qq.com"
+}
+
+local domain_set = {}
+for _, domain in ipairs(all_domains) do
+    domain_set[domain] = true
+end
+
 local function email_suffix_translator(input, seg)
-    -- 纯@输入，显示所有常用邮箱
+    -- 纯 @ 输入：显示最常用的邮箱后缀（可自定义顺序）
     if input == "@" then
         local popular_emails = {
-            "@qq.com",
-            "@163.com", 
-            "@gmail.com",
-            "@live.com",
-            "@126.com",
-            "@outlook.com",
-            "@hotmail.com",
-            "@sina.com",
-            "@sohu.com",
-            "@yahoo.com",
-            "@foxmail.com",
-            "@aliyun.com",
-            "@139.com",
-            "@189.cn",
-            "@yeah.net",
-            "@icloud.com"
+            "@qq.com", "@163.com", "@gmail.com", "@outlook.com",
+            "@126.com", "@live.com", "@hotmail.com", "@sina.com",
+            "@139.com", "@foxmail.com", "@aliyun.com", "@icloud.com"
         }
-        
-        for i, email in ipairs(popular_emails) do
+        for _, email in ipairs(popular_emails) do
             yield(Candidate("email", seg.start, seg._end, email, ""))
         end
         return
     end
-    
-    -- @后输入内容，进行智能补全
+
+    -- @ 后跟了内容：智能补全
     if string.sub(input, 1, 1) == "@" then
-        local search_text = string.sub(input, 2):lower()  -- 转换为小写进行匹配
-        local all_domains = {
-            "gmail.com", "qq.com", "163.com", "126.com", "sina.com", 
-            "sohu.com", "outlook.com", "hotmail.com", "yahoo.com", 
-            "foxmail.com", "aliyun.com", "139.com", "189.cn", "yeah.net",
-            "live.com", "icloud.com", "msn.com", "aol.com", "mail.com",
-            "tom.com", "21cn.com", "188.com", "wo.cn", "vip.qq.com"
-        }
-        
+        local search = string.sub(input, 2):lower()
+        if search == "" then return end
+
         local matched = {}
-        
-        -- 精确匹配开头
+        local seen = {}
+
+        -- 精确匹配（以 search 开头）
         for _, domain in ipairs(all_domains) do
-            if string.find(domain, search_text) == 1 then
-                table.insert(matched, domain)
-            end
-        end
-        
-        -- 模糊匹配（如果精确匹配结果较少）
-        if #matched < 3 and search_text ~= "" then
-            for _, domain in ipairs(all_domains) do
-                if string.find(domain, search_text) and not string.find(domain, search_text) == 1 then
+            if string.find(domain, search, 1, true) == 1 then
+                if not seen[domain] then
+                    seen[domain] = true
                     table.insert(matched, domain)
                 end
             end
         end
-        
-        -- 限制结果数量
+
+        -- 模糊匹配（包含 search 但不在开头），仅在精确匹配少于 3 个时执行
+        if #matched < 3 then
+            for _, domain in ipairs(all_domains) do
+                if string.find(domain, search, 1, true) and not seen[domain] then
+                    seen[domain] = true
+                    table.insert(matched, domain)
+                end
+            end
+        end
+
+        -- 输出候选（最多 8 个）
         local max_results = 8
         for i = 1, math.min(#matched, max_results) do
             yield(Candidate("email", seg.start, seg._end, "@" .. matched[i], ""))
         end
-        
-        -- 如果没有匹配结果，显示提示
-        if #matched == 0 and search_text ~= "" then
-            yield(Candidate("email", seg.start, seg._end, "继续输入域名...", ""))
-        end
+
+        -- 无匹配时不输出任何候选（保持候选栏干净）
     end
 end
 

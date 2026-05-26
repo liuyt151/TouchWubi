@@ -26,9 +26,64 @@
 --   - lua/tips/tips_user.txt                  # 用户自定义提示（用户目录）
 --
 -- 无需识别器配置，脚本通过 context:get_option("super_tips") 开关控制
-local wanxiang = require("wanxiang")
 local bit = require("lib/bit")
 local userdb = require("lib/userdb")
+
+-- ==================== 独立工具函数（原 wanxiang.lua 依赖）====================
+
+-- RIME 处理结果常量
+local RIME_PROCESS_RESULTS = {
+    kRejected = 0, -- 表示处理器明确拒绝了这个按键，停止处理链但不返回 true
+    kAccepted = 1, -- 表示处理器成功处理了这个按键，停止处理链并返回 true
+    kNoop = 2,     -- 表示处理器没有处理这个按键，继续传递给下一个处理器
+}
+
+-- 版本号（用于数据库重建判断）
+local SUPER_TIPS_VERSION = "v13.9.4"
+
+-- 判断文件是否存在
+local function file_exists(filename)
+    local f = io.open(filename, "r")
+    if f ~= nil then
+        io.close(f)
+        return true
+    else
+        return false
+    end
+end
+
+-- 按照优先顺序获取文件：用户目录 > 系统目录
+local function get_filename_with_fallback(filename)
+    local _path = filename:gsub("^/+", "") -- 去掉开头的斜杠
+
+    local user_path = rime_api.get_user_data_dir() .. '/' .. _path
+    if file_exists(user_path) then
+        return user_path
+    end
+
+    local shared_path = rime_api.get_shared_data_dir() .. '/' .. _path
+    if file_exists(shared_path) then
+        return shared_path
+    end
+
+    return nil
+end
+
+-- 判断是否处于功能模式
+local function is_function_mode_active(context)
+    if not context or not context.composition or context.composition:empty() then
+        return false
+    end
+
+    local seg = context.composition:back()
+    if not seg then return false end
+
+    return seg:has_tag("number") or  -- number_translator.lua 数字金额转换 R+数字
+        seg:has_tag("unicode") or    -- unicode.lua 输出 Unicode 字符 U+小写字母或数字
+        seg:has_tag("calculator") or -- super_calculator.lua V键计算器
+        seg:has_tag("shijian") or    -- shijian.lua /rq /sr 等与时间日期相关功能
+        seg:has_tag("Ndate")         -- shijian.lua N日期功能
+end
 
 local tips_db = userdb.LevelDb("lua/tips")
 
@@ -64,11 +119,11 @@ tips.status = "pending"
 
 ---@type table<string, boolean>
 tips.disabled_types = {}
-tips.preset_file_path = wanxiang.get_filename_with_fallback("lua/tips/tips_show.txt")
+tips.preset_file_path = get_filename_with_fallback("lua/tips/tips_show.txt")
 tips.user_override_path = rime_api.get_user_data_dir() .. "/lua/tips/tips_user.txt"
 
 local META_KEY = {
-    version = "wanxiang_version",
+    version = "super_tips_version",
     user_file_hash = "user_tips_file_hash",
     disabled_types = "disabled_types",
 }
@@ -136,8 +191,8 @@ function tips.init(config)
     tips_db:open()
     local needs_rebuild = false
 
-    -- 检查 1: 万象版本号
-    if tips_db:meta_fetch(META_KEY.version) ~= wanxiang.version then
+    -- 检查 1: super_tips 版本号
+    if tips_db:meta_fetch(META_KEY.version) ~= SUPER_TIPS_VERSION then
         needs_rebuild = true
     end
 
@@ -170,7 +225,7 @@ function tips.init(config)
         tips.init_db_from_file(tips.user_override_path)
 
         -- 重建成功后，再更新所有元数据，确保操作的原子性
-        tips_db:meta_update(META_KEY.version, wanxiang.version)
+        tips_db:meta_update(META_KEY.version, SUPER_TIPS_VERSION)
         tips_db:meta_update(META_KEY.user_file_hash, user_file_hash)
         tips_db:meta_update(META_KEY.disabled_types, disabled_types_str)
     end
@@ -272,16 +327,16 @@ function P.func(key, env)
 
     local is_tips_enabled = context:get_option("super_tips")
     if not is_tips_enabled then
-        return wanxiang.RIME_PROCESS_RESULTS.kNoop
+        return RIME_PROCESS_RESULTS.kNoop
     end
 
     -- 以下处理 tips 上屏逻辑
     if not P.tips_key                                   -- 未设置上屏键
         or P.tips_key ~= key:repr()                     -- 或者当前按下的不是上屏键
-        or wanxiang.is_function_mode_active(context)    -- 或者是功能模式不用上屏
+        or is_function_mode_active(context)             -- 或者是功能模式不用上屏
         or not env.current_tip or env.current_tip == "" --  或匹配的 tips 为空/空字符串
     then
-        return wanxiang.RIME_PROCESS_RESULTS.kNoop
+        return RIME_PROCESS_RESULTS.kNoop
     end
 
     ---@type string 从 tips 内容中获取上屏文本
@@ -291,10 +346,10 @@ function P.func(key, env)
     if commit_txt and #commit_txt > 0 then
         env.engine:commit_text(commit_txt)
         context:clear()
-        return wanxiang.RIME_PROCESS_RESULTS.kAccepted
+        return RIME_PROCESS_RESULTS.kAccepted
     end
 
-    return wanxiang.RIME_PROCESS_RESULTS.kNoop
+    return RIME_PROCESS_RESULTS.kNoop
 end
 
 return P

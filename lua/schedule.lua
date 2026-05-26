@@ -20,10 +20,14 @@
 --     schedule: "^/(jc|jq|gz|date)"           # 日程命令模式（可选）
 --
 -- 脚本内部通过输入字符串精确匹配判断：
---   - "/jc" - 显示完整日程信息
+--   - "/jt" - 显示今天信息（日期、农历、节日、节气倒计时）
 --   - "/jq" - 显示二十四节气
 --   - "/gz" - 显示干支历
 --   - "/date" - 显示农历日期转换
+--   - "/rq" - 显示日期（多种格式）
+--   - "/sj" - 显示时间
+--   - "/xq" - 显示星期
+--   - "/dt" - 显示日期时间
 --
 -- 生成日程表候选，如：
 --[[
@@ -60,12 +64,56 @@
 
 require("lib/lunar")
 
--- +++ 主函数 +++
+-- === 主函数 +++
 local function schedule(input, seg, env)
     local engine = env.engine
     local context = engine.context
 
-    if (input == "/jq") then
+    -- 基础日期时间快捷命令（来自date_translator.lua）
+    if (input == "/rq") then
+        -- 日期快捷命令
+        local current_time = os.time()
+        local candidates = {
+            {os.date('%Y-%m-%d', current_time), "日期"},
+            {os.date('%Y/%m/%d', current_time), "日期"},
+            {os.date('%Y.%m.%d', current_time), "日期"},
+            {os.date('%Y%m%d', current_time), "日期"},
+            {os.date('%Y年%m月%d日', current_time):gsub('年0', '年'):gsub('月0','月'), "日期"}
+        }
+        generate_candidates("date", seg, candidates)
+        
+    elseif (input == "/sj") then
+        -- 时间快捷命令
+        local current_time = os.time()
+        local candidates = {
+            {os.date('%H:%M', current_time), "时间"},
+            {os.date('%H:%M:%S', current_time), "时间"}
+        }
+        generate_candidates("time", seg, candidates)
+        
+    elseif (input == "/xq") then
+        -- 星期快捷命令
+        local current_time = os.time()
+        local week_tab = {'日', '一', '二', '三', '四', '五', '六'}
+        local text = week_tab[tonumber(os.date('%w', current_time) + 1)]
+        local candidates = {
+            {'星期' .. text, "星期"},
+            {'礼拜' .. text, "星期"},
+            {'周' .. text, "星期"}
+        }
+        generate_candidates("week", seg, candidates)
+        
+    elseif (input == "/dt") then
+        -- 日期时间快捷命令
+        local current_time = os.time()
+        local candidates = {
+            {os.date('%Y-%m-%dT%H:%M:%S+08:00', current_time), "日期时间"},
+            {os.date('%Y-%m-%d %H:%M:%S', current_time), "日期时间"},
+            {os.date('%Y%m%d%H%M%S', current_time), "日期时间"}
+        }
+        generate_candidates("datetime", seg, candidates)
+        
+    elseif (input == "/jq") then
         -- === 节气查询功能 ===
         local current_date = os.date("%Y%m%d")
         local jqs = GetNowTimeJq(current_date)
@@ -148,7 +196,7 @@ local function schedule(input, seg, env)
         local candidates = {{date_info, "农历转换"}}
         generate_candidates("lunar_query", seg, candidates)
 
-    elseif (input == "/jc") then
+    elseif (input == "/jt") then
 
         -- ---〔 ❶ 问候语 〕---
         local function get_greeting()
@@ -330,7 +378,7 @@ local function schedule(input, seg, env)
         -- ---〔 ⓿ 信息串 〕--- 
         -- --- 生成最终信息字符串 ---
         local summary = 
-            string.format("\n嗨，%s〔%s〕\n", greeting, os.date('%H点%M分%S秒', now)) .. 
+            string.format("嗨，%s〔%s〕\n", greeting, os.date('%H点%M分%S秒', now)) .. 
             string.format("%d年%02d月%02d日（第 %d 周）%s\n", year, month, day, week_of_year, week_day_str) ..
             string.format("%d年已过 %d 天(%s)，共 %d 天\n", year, day_of_year - 1, year_progress_text, days_in_year) ..
             string.format("农历：%s %s\n", lunar_info_str, zero_jieqi) ..
@@ -353,11 +401,14 @@ end
 
 -- === 辅助函数说明 ===
 -- 本文件新增的快捷键功能：
--- /jq  - 显示二十四节气信息
--- /gz  - 显示干支历信息  
+-- /jt   - 显示今天信息（日期、农历、节日、节气倒计时）
+-- /jq   - 显示二十四节气信息
+-- /gz   - 显示干支历信息  
 -- /date - 显示农历日期转换信息
--- /jc  - 显示完整的日程信息（原有功能）
-
+-- /rq   - 显示日期（多种格式：2025-01-01、2025/01/01、2025年1月1日等）
+-- /sj   - 显示时间（HH:MM、HH:MM:SS）
+-- /xq   - 显示星期（星期X、礼拜X、周X）
+-- /dt   - 显示日期时间（ISO 8601格式等）
 -- 所有功能都依赖 lunar.lua 中的函数：
 -- GetNowTimeJq() - 获取节气信息
 -- lunarJzl() - 获取干支信息
