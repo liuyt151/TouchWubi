@@ -175,6 +175,7 @@ engine:
   
   # 翻译器列表（translators）：将输入转换为候选项
   translators:
+    - lua_translator@*check_dist_name   # 添加这一行
     # 标点翻译器：翻译标点符号
     - punct_translator
     # Lua翻译器：英文→中文翻译器（支持英文单词翻译）
@@ -297,6 +298,8 @@ recognizer:
   import_preset: default
   # 识别模式列表
   patterns:
+    # 表达式模式：匹配以=开头的数学表达式（计算器翻译器）
+    expression: "^=.*$"
     # 自造词模式：匹配`键引导的自造词输入（例如：aa`bb 表示两个字的自造词）
     mkst: "^[a-y]*`[a-y`]*$"
     # 标点符号模式：匹配以/开头的数字或字母（用于调取symbol.yaml中的符号）

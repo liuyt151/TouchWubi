@@ -16,6 +16,8 @@ __include: wubi.schema:/
 schema:
   schema_id: &schema wubi_14
   name: "拇指五笔"
+  dependencies:
+    - wb_spelling   # 字根拆分数据库（用于字根显示）
 
   author:
     - Liuyt151
@@ -24,6 +26,7 @@ schema:
     流萤
       流光一瞬，不羡永恒。
       萤火虽微，自照前程。
+
 # 功能开关列表配置
 switches:
   # 开关1：编码（五笔码）显示控制
@@ -92,26 +95,15 @@ switches:
     states: [ 半角, 全角 ]
     comment: "字符全角/半角"
 
-engine:
-  translators/+:
-    - lua_translator@*email_suffix_translator  # 显示常用邮箱后缀
-    - lua_translator@*input_statistics         # 输入统计（/tj 等）
-# ========================================
-# ⌨️ 拼写规则配置（Speller）
-# ========================================
+
+# 拼音拼写器配置（定义输入字符集和拼写规则）
 speller/+:
-  # 字母表：定义可用的字母字符（按字母逆序排列，包含反引号用于自造词）
-  alphabet: zyxwvutsrqponmlkjihgfedcba`/@=
-  # 首字母：定义可作为首字母的字符
-  initials: zyxwvutsrqponmlkjihgfedcba`/@=
-  # 自动上屏规则：5码自动上屏（音辅码），4码不上屏等待筛选
-  auto_select_pattern: ^;.$|^\w{5}$
-  # 启用编码补全：允许4码匹配5码前缀
-  enable_completion: true
+  enable_completion: true                  # 启用编码补全：允许4码匹配5码前缀
+  auto_select_pattern: ^;.$|^\w{5}$        # 5码自动上屏（音辅码），4码不上屏等待筛选
   algebra/+:                               # algebra: 音节/编码变换规则列表,使用 /+/ 表示“追加到原列表末尾”
-# ========================================
-# 🌟 通配符规则（用于模糊五笔输入）
-# ========================================
+    # ========================================
+    # 🌟 通配符规则（用于模糊五笔输入）
+    # ========================================
     - "derive/^z$/*/"                      # 单独一个 z → 通配符 *
     - "derive/^z(.*)$/$1/"                 # z+其他码 → 替换为剩余部分（实现模糊匹配）
     # 14键映射规则
@@ -127,22 +119,48 @@ speller/+:
     - derive/c/x/     # C 键 → 视为 X 区（女）
     - derive/b/v/     # B 键 → 视为 V 区（已）
     - derive/m/n/     # M 键 → 视为 N 区（力）
-# ========================================
-# 📚 翻译器配置（Translators）
-# ========================================
-translator/+:
-  dictionary: wubi_14                       # 使用14键适配字典（带第5位音辅码）
+
+# 五笔翻译器配置（主翻译器，使用14键五笔码表）
+# 使用 script_translator 替代 table_translator，解决双键映射后词频不传递的问题
+# 参考：https://github.com/osfans/trime/issues/61
+engine/translators:
+  - punct_translator
+  - lua_translator@*english_translator
+  - script_translator@wubi_14_main
+  - lua_translator@user_coined_translator
+  - table_translator@fixed
+  - table_translator@mkst
+  - reverse_lookup_translator
+  - lua_translator@*calculator
+  - lua_translator@*schedule
+  - lua_translator@*email_suffix_translator
+  - lua_translator@*input_statistics
+
+# script_translator 主翻译器配置（支持衍生码词频传递）
+wubi_14_main:
+  dictionary: wubi                        # 使用主字典（14键映射由棱镜处理）
   prism: *schema                            # 使用的棱镜文件（用于用户词典学习）
   enable_user_dict: true                    # 启用用户词典学习
   encode_commit_history: true               # 编码提交历史（学习用户习惯）
   enable_encoder: true                      # 启用编码器（自动生成词组）
   max_phrase_length: 4                      # 最大词组长度
-  initial_quality: 500                      # 初始质量值（确保基础优先级）
+  initial_quality: 0.5                      # 初始质量值（script_translator使用0-1范围）
   enable_completion: true                   # 启用编码补全：允许4码匹配5码前缀
-  enable_sentence: false                    # 禁用句子输入（14键不需要）
-# ========================================
-# 🔍 识别器增强：支持短码快速上屏
-# ========================================
+  enable_sentence: false                    # 禁用句子输入（五笔不需要）
+  enable_charset_filter: false              # 禁用字符集过滤，支持扩展字符
+  strict_spelling: false                    # 允许不严格匹配（支持衍生码）
+  # 编码器配置（参考仓颉速成方案，适配五笔形码）
+  encoder:
+    exclude_patterns:
+      - "^z.*$"
+    rules:
+      - length_equal: 2
+        formula: "AaAbBaBb"  # 两字词：取各字前两码
+      - length_equal: 3
+        formula: "AaBaCa"    # 三字词：取各字首码+末字次码
+      - length_in_range: [4, 32]
+        formula: "AaBaCaZa"  # 多字词：取首三字首码+末字首码
+# 识别器配置（定义特殊输入模式的识别规则）
 recognizer/+:
   patterns/+:
     short_code: "^[a-z]{1,3}$"              # 14键特有短码识别
