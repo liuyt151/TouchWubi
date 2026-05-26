@@ -620,6 +620,19 @@ function GetNowTimeJq(date)
 end
 -- === 农历节气计算部分 END ===
 
+-- 常量定义
+local JQ_LIST = {
+    "立春", "雨水", "惊蛰", "春分", "清明", "谷雨", "立夏", "小满", "芒种", "夏至", "小暑", "大暑",
+    "立秋", "处暑", "白露", "秋分", "寒露", "霜降", "立冬", "小雪", "大雪", "冬至", "小寒", "大寒"
+}
+local TIANGAN = {'甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'}
+local DIZHI = {'子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'}
+local JIAZI_YEAR = 1984
+local JIAZI_DAY_TIME = os.time({year=2012, month=8, day=30, hour=23, min=0, sec=0})
+local JIAZI_SHI_TIME = JIAZI_DAY_TIME
+local REFERENCE_MONTH = os.time({year=2010, month=2, day=4, hour=6, min=42, sec=0})
+local DAY_SECONDS = 24 * 3600
+local SHICHEN_SECONDS = 3600 * 2
 
 -- 公历转干支历实现
 --干支历的年以立春发生时刻（注意，不是立春日的0时）为年干支的起点；各月干支以十二节时刻（注意，不一定是各节气日的0时）
@@ -721,24 +734,14 @@ end
 
 -- 返回年的干支序号，1为甲子。。。
 function GanZhiLi:getYearGanZhi()
-    local jiaziYear = 1984 -- 甲子年
-    -- print(self.ganZhiYearNum)
-    local yeardiff = self.ganZhiYearNum - jiaziYear
+    local yeardiff = self.ganZhiYearNum - JIAZI_YEAR
     return self:calRound(1, yeardiff, 60)
 end
 
 -- 返回月的干支号
 function GanZhiLi:getMonGanZhi()
-    local ck = {
-        year = 2010,
-        month = 2,
-        day = 4,
-        hour = 6,
-        min = 42,
-        sec = 0
-    }
-    local x = os.time(ck) -- 参考月，立春时间2010-2-4 6:42:00对应的干支序号为15
-    local ydiff = self.ganZhiYearNum - ck.year
+    local x = REFERENCE_MONTH -- 参考月，立春时间2010-2-4 6:42:00对应的干支序号为15
+    local ydiff = self.ganZhiYearNum - 2010
     local mdiff = self.ganZhiMonNum - 1
     if ydiff >= 0 then
         mdiff = ydiff * 12 + mdiff
@@ -750,45 +753,18 @@ end
 
 -- 返回日的干支号，甲子从1开始
 function GanZhiLi:getDayGanZhi()
-    local DAYSEC = 24 * 3600
-    local jiaziDayTime = os.time({
-        year = 2012,
-        month = 8,
-        day = 30,
-        hour = 23,
-        min = 0,
-        sec = 0
-    })
-    local daydiff = math.floor((self.ttime - jiaziDayTime) / DAYSEC)
+    local daydiff = math.floor((self.ttime - JIAZI_DAY_TIME) / DAY_SECONDS)
     return self:calRound(1, daydiff, 60)
 end
 
 -- 返回时辰的干支号
 function GanZhiLi:getHourGanZhi()
-    local SHICHENSEC = 3600 * 2
-    local jiaziShiTime = os.time({
-        year = 2012,
-        month = 8,
-        day = 30,
-        hour = 23,
-        min = 0,
-        sec = 0
-    })
-    local shiDiff = math.floor((self.ttime - jiaziShiTime) / SHICHENSEC)
+    local shiDiff = math.floor((self.ttime - JIAZI_SHI_TIME) / SHICHEN_SECONDS)
     return self:calRound(1, shiDiff, 60)
 end
 
 -- ====================以下是测试代码=============
--- 节气表
-local jqB = { 
-    "立春", "雨水", "惊蛰", "春分", "清明", "谷雨", "立夏", "小满", "芒种", "夏至", "小暑", "大暑",
-    "立秋", "处暑", "白露", "秋分", "寒露", "霜降", "立冬", "小雪", "大雪", "冬至", "小寒", "大寒"
-}
--- 天干
-local tiangan = {'甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'}
-
--- 地支
-local dizhi = {'子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'}
+-- 节气表、天干、地支已经在上方定义为常量 JQ_LIST, TIANGAN, DIZHI
 
 -- 根据六十甲子序号，返回六十甲子字符串,甲子从1开始
 function get60JiaZiStr(i)
@@ -800,7 +776,7 @@ function get60JiaZiStr(i)
     if zhi == 0 then
         zhi = 12
     end
-    return tiangan[gan] .. dizhi[zhi]
+    return TIANGAN[gan] .. DIZHI[zhi]
 end
 
 function lunarJzl(y)
