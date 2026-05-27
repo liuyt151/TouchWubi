@@ -11,8 +11,6 @@
 name: wubi
 version: "2.0"
 sort: by_weight
-import_tables:
-  - wubi.extended
 columns:
   - text
   - code

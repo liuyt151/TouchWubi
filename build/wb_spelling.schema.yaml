@@ -1,0 +1,36 @@
+__build_info:
+  rime_version: 1.16.0
+  timestamps:
+    default: 1779805011
+    default.custom: 1779805011
+    key_bindings: 1779834992
+    key_bindings.custom: 0
+    symbols: 1779805011
+    symbols.custom: 0
+    wb_spelling.custom: 0
+    wb_spelling.schema: 1779805011
+menu:
+  alternative_select_labels:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+  page_size: 6
+schema:
+  author:
+    - "网络资料整合版"
+  description: |
+    伪方案，请勿编辑!!!
+    仅用于辅助三重注解方案实现注解功能。
+
+  name: "流萤字根"
+  schema_id: wb_spelling
+  version: 2.0
+translator:
+  dictionary: wb_spelling

@@ -104,7 +104,7 @@ recognizer:
     reverse_lookup: "^z[a-z]*'?$"
   
 ci_reverse_lookup:
-  dictionary: wubi
+  dictionary: wubi.extended
   enable_completion: true
   tips: 〈拼音〉  
 

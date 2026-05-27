@@ -9,8 +9,9 @@
 name: wubi.extended              # 方案名称：wubi.extended（五笔扩展方案）
 version: "2.0"
 sort: by_weight                  # 排序方式：by_weight（按词频权重降序排列）
-# 本扩展词库被 wubi.dict.yaml 和 wubi_14.dict.yaml 导入
-# 作为共享自定义词库中心
+import_tables:                   # 导入基础表：继承 wubi 方案的所有词条
+  - wubi
+  # user_coined_ext 已通过 lua_translator@user_coined_translator 实现即时查询，无需在此导入
 columns:                         # 列定义：词典文件的四列结构
   - text                         # 第1列：汉字/词语
   - code                         # 第2列：五笔编码

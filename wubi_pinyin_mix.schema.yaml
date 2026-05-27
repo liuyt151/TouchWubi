@@ -175,7 +175,6 @@ engine:
   
   # 翻译器列表（translators）：将输入转换为候选项
   translators:
-    - lua_translator@*check_dist_name   # 添加这一行
     # 标点翻译器：翻译标点符号
     - punct_translator
     # Lua翻译器：英文→中文翻译器（支持英文单词翻译）
@@ -219,7 +218,7 @@ speller:
 # 五笔翻译器配置（主翻译器，使用五笔码表）
 translator:
   # 使用的字典文件名
-  dictionary: wubi
+  dictionary: wubi.extended
   # 棱镜文件名（编译后的字典，用于快速查询）
   prism: wubi_pinyin_mix
   # 数据库类型：使用表格数据库
@@ -416,7 +415,7 @@ abc_segmentor:
 # 用户词典翻译器（自动学习用户词组，即时生效）
 fixed:
   db_class: tabledb
-  dictionary: wubi
+  dictionary: wubi.extended
   disable_user_dict_for_patterns:
     - "^z.*$"
   enable_charset_filter: false
@@ -431,7 +430,7 @@ fixed:
 # 自造词临时翻译器（`键引导）
 mkst:
   db_class: tabledb
-  dictionary: wubi
+  dictionary: wubi.extended
   disable_user_dict_for_patterns:
     - "^z.*$"
   enable_charset_filter: false

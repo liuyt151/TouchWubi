@@ -146,7 +146,7 @@ engine:
     - simplifier@es_conversion
     # 唯一化器：去除重复的候选项
     - uniquifier
-  
+
   # 分段器列表（segmentors）：将输入分段成不同的处理单元
   segmentors:
     # ASCII分段器：处理纯ASCII输入
@@ -163,10 +163,9 @@ engine:
     - fallback_segmentor
     # Lua分段器：配对标点分段器
     - lua_segmentor@*pair_punct*segmentor
-  
+
   # 翻译器列表（translators）：将输入转换为候选项
   translators:
-    - lua_translator@*check_dist_name   # 添加这一行
     # 标点翻译器：翻译标点符号
     - punct_translator
     # Lua翻译器：英文→中文翻译器（支持英文单词翻译）
@@ -202,12 +201,13 @@ speller:
   auto_clear: max_length
   auto_select_pattern: ^;.$|^\w{4}$       # 四码自动上屏（由 smart_commit 补充）
   algebra:
-    - erase/^xx$/                         # 规则1：删除匹配 "xx" 的输入（用于特殊触发）
+    # 规则1：删除匹配 "xx" 的输入（用于特殊触发）
+    - erase/^xx$/
 
 # 五笔翻译器配置（主翻译器，使用五笔码表）
 translator:
   # 使用的字典文件名
-  dictionary: wubi
+  dictionary: wubi.extended
   # 数据库类型：使用表格数据库
   db_class: tabledb
   # 初始质量值：候选项的优先级权重（1000为最高优先级）
@@ -403,7 +403,7 @@ punctuator:
 # 用户词典翻译器（自动学习用户词组，即时生效）
 fixed:
   db_class: tabledb
-  dictionary: wubi
+  dictionary: wubi.extended
   disable_user_dict_for_patterns:
     - "^z.*$"
   enable_charset_filter: false
@@ -418,7 +418,7 @@ fixed:
 # 自造词临时翻译器（`键引导）
 mkst:
   db_class: tabledb
-  dictionary: wubi
+  dictionary: wubi.extended
   disable_user_dict_for_patterns:
     - "^z.*$"
   enable_charset_filter: false

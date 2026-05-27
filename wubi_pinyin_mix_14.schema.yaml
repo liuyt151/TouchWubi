@@ -16,8 +16,6 @@ __include: wubi_pinyin_mix.schema:/
 schema:
   schema_id: &schema wubi_pinyin_mix_14
   name: "拇指双混"
-  dependencies:
-    - wb_spelling   # 字根拆分数据库（用于字根显示）
 
   author:
     - Liuyt151
@@ -26,7 +24,6 @@ schema:
     流萤
       流光一瞬，不羡永恒。
       萤火虽微，自照前程。
-
 # 功能开关列表配置
 switches:
   # 开关1：编码（五笔码）显示控制
@@ -101,15 +98,35 @@ switches:
     states: [ 半角, 全角 ]
     comment: "字符全角/半角"
 
-
-# 拼音拼写器配置（定义输入字符集和拼写规则）
+engine:
+  translators:
+    - punct_translator
+    - lua_translator@*english_translator
+    - script_translator
+    - lua_translator@user_coined_translator
+    - script_translator@fixed
+    - script_translator@mkst
+    - reverse_lookup_translator
+    - lua_translator@*calculator
+    - lua_translator@*schedule
+    - lua_translator@*email_suffix_translator
+    - lua_translator@*input_statistics
+# ========================================
+# ⌨️ 拼写规则配置（Speller）
+# ========================================
 speller/+:
-  enable_completion: true                  # 启用编码补全：允许4码匹配5码前缀
-  auto_select_pattern: ^;.$|^\w{5}$        # 5码自动上屏（音辅码），4码不上屏等待筛选
+  # 字母表：定义可用的字母字符（按字母逆序排列，包含反引号用于自造词）
+  alphabet: zyxwvutsrqponmlkjihgfedcba`/@=
+  # 首字母：定义可作为首字母的字符
+  initials: zyxwvutsrqponmlkjihgfedcba`/@=
+  # 自动上屏规则：5码自动上屏（音辅码），4码不上屏等待筛选
+  auto_select_pattern: ^;.$|^\w{5}$
+  # 启用编码补全：允许4码匹配5码前缀
+  enable_completion: true
   algebra/+:                               # algebra: 音节/编码变换规则列表,使用 /+/ 表示“追加到原列表末尾”
-    # ========================================
-    # 🌟 通配符规则（用于模糊五笔输入）
-    # ========================================
+# ========================================
+# 🌟 通配符规则（用于模糊五笔输入）
+# ========================================
     - "derive/^z$/*/"                      # 单独一个 z → 通配符 *
     - "derive/^z(.*)$/$1/"                 # z+其他码 → 替换为剩余部分（实现模糊匹配）
     # 14键映射规则
@@ -125,10 +142,11 @@ speller/+:
     - derive/c/x/     # C 键 → 视为 X 区（女）
     - derive/b/v/     # B 键 → 视为 V 区（已）
     - derive/m/n/     # M 键 → 视为 N 区（力）
-
-# 五笔翻译器配置（主翻译器，使用14键五笔码表）
-translator/+:
-  dictionary: wubi_14                       # 使用14键适配字典（带第5位音辅码）
+# ========================================
+# 📚 翻译器配置（Translators）
+# ========================================
+translator:
+  dictionary: wubi.extended                 # 使用扩展字典（包含用户词典）
   prism: *schema                            # 使用的棱镜文件（用于用户词典学习）
   enable_user_dict: true                    # 启用用户词典学习
   encode_commit_history: true               # 编码提交历史（学习用户习惯）
@@ -137,15 +155,48 @@ translator/+:
   initial_quality: 500                      # 初始质量值（确保基础优先级）
   enable_completion: true                   # 启用编码补全：允许4码匹配5码前缀
   enable_sentence: false                    # 禁用句子输入（14键不需要）
-# 用户词典翻译器（覆盖父方案，使用14键字典）
+  enable_charset_filter: false
+  db_class: tabledb
+  disable_user_dict_for_patterns:
+    - "^z.*$"
+
+# 用户词典翻译器（自动学习用户词组，即时生效）
 fixed:
-  dictionary: wubi_14
+  db_class: tabledb
+  dictionary: wubi.extended                 # 使用扩展字典（包含用户词典）
+  prism: *schema                            # 使用独立的棱镜文件
+  disable_user_dict_for_patterns:
+    - "^z.*$"
+  enable_charset_filter: false
+  enable_completion: false
+  enable_encoder: true
+  enable_sentence: false
+  enable_user_dict: true
+  encode_commit_history: false
+  initial_quality: 850                      # 降低优先级，避免错误词组永久固化
+  max_phrase_length: 4
 
-# 自造词临时翻译器（覆盖父方案，使用14键字典）
+# 自造词临时翻译器（`键引导）
 mkst:
-  dictionary: wubi_14
-
-# 识别器配置（定义特殊输入模式的识别规则）
+  db_class: tabledb
+  dictionary: wubi.extended                 # 使用扩展字典（包含用户词典）
+  prism: *schema                            # 使用独立的棱镜文件
+  disable_user_dict_for_patterns:
+    - "^z.*$"
+  enable_charset_filter: false
+  enable_completion: false
+  enable_encoder: false
+  enable_sentence: true
+  enable_user_dict: false
+  encode_commit_history: false
+  initial_quality: 450
+  max_phrase_length: 4
+  prefix: "`"
+  tag: mkst
+  tips: "〔自造词〕"
+# ========================================
+# 🔍 识别器增强：支持短码快速上屏
+# ========================================
 recognizer/+:
   patterns/+:
     short_code: "^[a-z]{1,3}$"              # 14键特有短码识别
