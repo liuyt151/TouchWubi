@@ -3,7 +3,6 @@
 # date: 2025-12-31
 # update_time: "2026-05-20"
 # description: 纯拼音输入模式
-# 更新：为另外的拇指混输增加14键映射
 schema:
   schema_id: pinyin
   name: "流萤拼音"
@@ -25,7 +24,7 @@ schema:
 
 switches:
   - name: ascii_mode
-    reset: 0
+    reset: 0              # 默认值为0（中文）
     states: [ 中, 英 ]
 
 engine:
@@ -70,20 +69,6 @@ speller:
     - derive/ao$/oa/
     - derive/([iu])a(o|ng?)$/a$1$2/
 
-# =============14键五笔映射（用于五笔拼音混输）
-    - derive/w/q/     # W 键 → 视为 Q 区（金）
-    - derive/r/e/     # R 键 → 视为 E 区（月）
-    - derive/y/t/     # Y 键 → 视为 T 区（禾）
-    - derive/i/u/     # I 键 → 视为 U 区（山）
-    - derive/p/o/     # P 键 → 视为 O 区（人）
-    - derive/s/a/     # S 键 → 视为 A 区（日）
-    - derive/f/d/     # F 键 → 视为 D 区（口）
-    - derive/h/g/     # H 键 → 视为 G 区（王）
-    - derive/k/j/     # K 键 → 视为 J 区（田）
-    - derive/c/x/     # C 键 → 视为 X 区（女）
-    - derive/b/v/     # B 键 → 视为 V 区（已）
-    - derive/m/n/     # M 键 → 视为 N 区（力）
-# =============通配符规则（用于模糊五笔输入）
 translator:
   dictionary: pinyin
   preedit_format:

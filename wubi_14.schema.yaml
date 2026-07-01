@@ -44,41 +44,35 @@ switches:
     states: [ 显拼, 隐拼 ]
     comment: "显示/隐藏单字带声调拼音"
 
-  # 开关4：配对标点控制（pair_symbol）
-  - name: pair_symbol
-    reset: 0                # 默认值为0（关闭配对）
-    states: [ "关配", "开配" ]
-    comment: "配对标点（括号、引号等自动成对）"
-
-  # 开关5：超级提示控制（super_tips）
-  - name: super_tips
-    reset: 0                # 默认值为0（关闭提示）
-    states: [ 关提, 开提 ]
-    comment: "超级提示"
-
-  # 开关6：中英转换控制（ce_trans）
-  - name: ce_trans
-    reset: 0                # 默认值为0（翻译关闭）
-    states: [ 关译, 开译 ]
-    comment: "中英文互译"
-
-  # 开关7：字符集控制（GB2312）
+  # 开关4：字符集控制（GB2312）
   - name: GB2312
     reset: 1                # 默认值为0（扩展字符集）
     states: [ 扩展, 常用 ]
     comment: "常用字符集（GB2312）过滤"
 
-  # 开关8：Emoji表情显示控制（show_es）
+  # 开关5：Emoji表情显示控制（show_es）
   - name: show_es
     reset: 0                # 默认值为0（隐藏表情）
     states: [ 隐表, 显表 ]
     comment: "Emoji 表情"
 
-  # 开关9：简繁转换控制（zh_trad）
+  # 开关6：超级提示控制（super_tips）
+  - name: super_tips
+    reset: 0                # 默认值为0（关闭提示）
+    states: [ 关提, 开提 ]
+    comment: "超级提示"
+
+  # 开关7：简繁转换控制（zh_trad）
   - name: zh_trad
     reset: 0                # 默认值为0（简体）
     states: [ 简体, 繁体 ]
     comment: "简繁转换"
+
+  # 开关9：半/全角转换控制（full_shape）
+  - name: full_shape
+    reset: 0                # 默认值为0（半角字符）
+    states: [ 半角, 全角 ]
+    comment: "字符全角/半角"
 
   # 开关10：标点符号全半角控制（ascii_punct）
   - name: ascii_punct
@@ -86,25 +80,47 @@ switches:
     states: [ 。，,．， ]
     comment: "标点符号全角/半角"
 
-  # 开关11：半/全角转换控制（full_shape）
-  - name: full_shape
-    reset: 0                # 默认值为0（半角字符）
-    states: [ 半角, 全角 ]
-    comment: "字符全角/半角"
-
 engine:
+  processors:
+    - ascii_composer
+    - lua_processor@*Submit_text
+    - lua_processor@*super_tips
+    - lua_processor@*super_sequence*P
+    - recognizer
+    - key_binder
+    - speller
+    - punctuator
+    - selector
+    - navigator
+    - express_editor
+  filters:
+    - lua_filter@*new_spelling
+    - lua_filter@*super_sequence*S         # 候选字词按词频自动排序（基于 quality 降序）
+    - lua_filter@*super_sequence*F         # 候选字词快捷键手动调序（移动设备send数字调序）
+    - lua_filter@*wubi_pinyin_filter       # 重码筛选（第五码拼音首字母筛选），放在S+F之后，在已排序候选基础上筛选
+    - simplifier
+    - simplifier@es_conversion
+    - uniquifier
+  segmentors:
+    - ascii_segmentor
+    - matcher
+    - affix_segmentor@mkst
+    - abc_segmentor
+    - punct_segmentor
+    - fallback_segmentor
   translators:
     - punct_translator
-    - lua_translator@*english_translator
-    - script_translator
+    - table_translator
     - lua_translator@user_coined_translator
-    - script_translator@fixed
-    - script_translator@mkst
+    - table_translator@fixed
+    - table_translator@mkst
+    - script_translator                    # 脚本翻译器为wubi_pinyin_filter实现重码筛选提供支持（第五码拼音首字母筛选）
     - reverse_lookup_translator
     - lua_translator@*calculator
-    - lua_translator@*schedule
-    - lua_translator@*email_suffix_translator
-    - lua_translator@*input_statistics
+    # Lua翻译器：日程翻译器（处理 /jc、/jq、/gz、/date 等命令）
+    - lua_translator@*schedule                 # 日程命令（/jc 等）
+    - lua_translator@*email_suffix_translator  # 显示常用邮箱后缀
+    - lua_translator@*input_statistics         # 输入统计（/tj 等）
 # ========================================
 # ⌨️ 拼写规则配置（Speller）
 # ========================================
@@ -113,11 +129,14 @@ speller/+:
   alphabet: zyxwvutsrqponmlkjihgfedcba`/@=
   # 首字母：定义可作为首字母的字符
   initials: zyxwvutsrqponmlkjihgfedcba`/@=
-  # 自动上屏规则：5码自动上屏（音辅码），4码不上屏等待筛选
-  auto_select_pattern: ^;.$|^\w{5}$
-  # 启用编码补全：允许4码匹配5码前缀
-  enable_completion: true
-  algebra/+:                               # algebra: 音节/编码变换规则列表,使用 /+/ 表示“追加到原列表末尾”
+  # 最大编码长度（自造词或者混输模式需要较长的编码）
+  max_code_length: 5                       # 5码拼音筛选特设
+  auto_clear: max_length                   # 6码顶字上屏
+  auto_select: false                       # 自动上屏开关
+  auto_select_pattern: ^;.$                # 分号自动上屏（仅上一句为true时生效）
+  enable_completion: true                  # 启用编码补全：重码筛选时显示4码前缀匹配的候选
+  # 拼写代数规则：定义输入转换规则
+  algebra/+:                               # algebra: 音节/编码变换规则列表,使用 /+/ 表示"追加到原列表末尾"
 # ========================================
 # 🌟 通配符规则（用于模糊五笔输入）
 # ========================================
@@ -142,9 +161,9 @@ speller/+:
 translator:
   dictionary: wubi.extended                 # 使用扩展字典（包含用户词典）
   prism: *schema                            # 使用的棱镜文件（用于用户词典学习）
-  enable_user_dict: true                    # 启用用户词典学习
-  encode_commit_history: true               # 编码提交历史（学习用户习惯）
-  enable_encoder: true                      # 启用编码器（自动生成词组）
+  enable_user_dict: false                   # 禁用用户词典学习
+  encode_commit_history: false              # 编码提交历史（学习用户习惯）
+  enable_encoder: false                     # 禁用编码器（自动生成词组）
   max_phrase_length: 4                      # 最大词组长度
   initial_quality: 500                      # 初始质量值（确保基础优先级）
   enable_completion: true                   # 启用编码补全：允许4码匹配5码前缀
@@ -158,16 +177,16 @@ translator:
 fixed:
   db_class: tabledb
   dictionary: wubi.extended                 # 使用扩展字典（包含用户词典）
-  prism: *schema                            # 使用独立的棱镜文件
+  prism: *schema                            # 使用独立的棱镜文件，确保词频排序正确
   disable_user_dict_for_patterns:
     - "^z.*$"
   enable_charset_filter: false
   enable_completion: false
-  enable_encoder: true
+  enable_encoder: false
   enable_sentence: false
-  enable_user_dict: true
+  enable_user_dict: false
   encode_commit_history: false
-  initial_quality: 850                      # 降低优先级，避免错误词组永久固化
+  initial_quality: 510                      # 略高于主词典，确保用户词优先但不覆盖精确匹配
   max_phrase_length: 4
 
 # 自造词临时翻译器（`键引导）
@@ -194,3 +213,14 @@ mkst:
 recognizer/+:
   patterns/+:
     short_code: "^[a-z]{1,3}$"              # 14键特有短码识别
+
+lua_reverse_db:
+  spelling: wb_spelling
+  code: wb_spelling
+
+reverse_lookup/+:
+  prism: pinyin_14
+
+wubi_pinyin_filter:            # 该段显式配置优先级高于脚本检测
+  use_key_pairs: true          # 按键对扩展：true = 14键模糊，false = 26键精确
+  use_last_char: true          # 首末字筛选：true = 末字筛选，false = 首字筛选

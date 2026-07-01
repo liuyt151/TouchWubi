@@ -31,63 +31,57 @@ schema:
   dependencies:
     - pinyin
     - wubi
-    - wb_spelling
+    - wb_spelling   # 字根拆分数库（用于字根显示）
 
 # 功能开关列表配置
 switches:
-  # 开关1：编码（五笔码）显示控制
-  - name: new_hide_code
-    reset: 0                # 默认值为0（显示字型编码）
-    states: [ 显码, 隐码 ]
-    comment: "显示/隐藏五笔字型编码（单字）"
-
-  # 开关2：字根（部件拆分）显示控制
-  - name: new_spelling
-    reset: 1                # 默认值为1（显示部件拆分）
-    states: [ 隐根, 显根 ]
-    comment: "显示/隐藏汉字部件拆分（字根）"
-
-  # 开关3：单字拼音显示控制
-  - name: new_hide_pinyin
-    reset: 0                # 默认值为0（显示带声调拼音）
-    states: [ 显拼, 隐拼 ]
-    comment: "显示/隐藏单字带声调拼音"
-
-  # 开关新增：词组拼音/字根拆分切换
+  # 开关1：词组拼音/字根拆分切换（混输专用）
   - name: new_phrase_pinyin
     reset: 0                # 默认值为0（隐声模式，显示字根拆分）
     states: [ 隐声, 显声 ]
     comment: "词组拼音/字根拆分切换（显声/隐声）"
 
-  # 开关4：配对标点控制（pair_symbol）
-  - name: pair_symbol
-    reset: 0                # 默认值为0（关闭配对）
-    states: [ "关配", "开配" ]
-    comment: "配对标点（括号、引号等自动成对）"
+  # 开关2：编码（五笔码）显示控制
+  - name: new_hide_code
+    reset: 0                # 默认值为0（显示字型编码）
+    states: [ 显码, 隐码 ]
+    comment: "显示/隐藏五笔字型编码（单字）"
 
-  # 开关5：超级提示控制（super_tips）
-  - name: super_tips
-    reset: 0                # 默认值为0（关闭提示）
-    states: [ 关提, 开提 ]
-    comment: "超级提示"
+  # 开关3：字根（部件拆分）显示控制
+  - name: new_spelling
+    reset: 1                # 默认值为1（显示部件拆分）
+    states: [ 隐根, 显根 ]
+    comment: "显示/隐藏汉字部件拆分（字根）"
 
-  # 开关6：中英转换控制（ce_trans）
-  - name: ce_trans
-    reset: 0                # 默认值为0（翻译关闭）
-    states: [ 关译, 开译 ]
-    comment: "中英文互译"
+  # 开关4：单字拼音显示控制
+  - name: new_hide_pinyin
+    reset: 0                # 默认值为0（显示带声调拼音）
+    states: [ 显拼, 隐拼 ]
+    comment: "显示/隐藏单字带声调拼音"
 
-  # 开关7：字符集控制（GB2312）
+  # 开关5：字符集控制（GB2312）
   - name: GB2312
     reset: 0                # 默认值为0（扩展字符集）
     states: [ 扩展, 常用 ]
     comment: "常用字符集（GB2312）过滤"
 
-  # 开关8：Emoji表情显示控制（show_es）
+  # 开关6：配对标点控制（pair_symbol）
+  - name: pair_symbol
+    reset: 1                # 默认值为1（开启配对）
+    states: [ "关配", "开配" ]
+    comment: "配对标点（括号、引号等自动成对）"
+
+  # 开关7：Emoji表情显示控制（show_es）
   - name: show_es
     reset: 0                # 默认值为0（隐藏表情）
     states: [ 隐表, 显表 ]
     comment: "Emoji 表情"
+
+  # 开关8：超级提示控制（super_tips）
+  - name: super_tips
+    reset: 0                # 默认值为0（关闭提示）
+    states: [ 关提, 开提 ]
+    comment: "超级提示"
 
   # 开关9：简繁转换控制（zh_trad）
   - name: zh_trad
@@ -95,29 +89,27 @@ switches:
     states: [ 简体, 繁体 ]
     comment: "简繁转换"
 
-  # 开关10：标点符号全半角控制（ascii_punct）
-  - name: ascii_punct
-    reset: 0                # 默认值为0（全角标点）
-    states: [ 。，,．， ]
-    comment: "标点符号全角/半角"
-
   # 开关11：半/全角转换控制（full_shape）
   - name: full_shape
     reset: 0                # 默认值为0（半角字符）
     states: [ 半角, 全角 ]
     comment: "字符全角/半角"
 
+  # 开关12：标点符号全半角控制（ascii_punct）
+  - name: ascii_punct
+    reset: 0                # 默认值为0（全角标点）
+    states: [ 。，,．， ]
+    comment: "标点符号全角/半角"
+
 # 引擎配置块，定义输入法引擎的核心组件
 engine:
-  mixed_input: true   # 告诉 new_spelling.Lua 这是混输方案
+  mixed_input: true                        # 告诉 new_spelling.Lua 这是混输方案使（显声/隐声）有效
   # 处理器列表（processors）：按顺序处理用户输入
   processors:
     # ASCII模式切换处理器：处理中英文输入切换
     - ascii_composer
     # Lua处理器：自造词记录处理器（监控并记录用户自造词）
     - lua_processor@*Submit_text
-    # Lua处理器：智能上屏处理器（五笔四码自动上屏，拼音保持候选）
-    - lua_processor@*smart_commit
     # Lua处理器：超级提示处理器
     - lua_processor@*super_tips
     # Lua处理器：超序列前移处理器（Super Sequence Processor）
@@ -144,18 +136,16 @@ engine:
     # Lua过滤器：新拼写过滤器（处理字根显示）
     - lua_filter@*new_spelling
     # Lua过滤器：超序列过滤器（处理候选项排序）
-    - lua_filter@*super_sequence*F
+    - lua_filter@*super_sequence*S         # 候选字词按词频自动排序（基于 quality 降序）
+    - lua_filter@*super_sequence*F         # 候选字词快捷键手动调序（移动设备send数字调序）
+    - lua_filter@*wubi_pinyin_filter       # 重码筛选（第五码拼音首字母筛选），放在S+F之后，在已排序候选基础上筛选
     # 简化器：执行通用简化和过滤操作
     - simplifier
-    # 中英转换过滤器：中文英文互译
-    - simplifier@ce_en_conversion
-    # Lua过滤器：翻译合并过滤器（将拆分的翻译候选项合并为一行）
-    - lua_filter@*translate_merge
     # Emoji转换过滤器：将文本转换为Emoji表情
     - simplifier@es_conversion
     # 唯一化器：去除重复的候选项
     - uniquifier
-  
+
   # 分段器列表（segmentors）：将输入分段成不同的处理单元
   segmentors:
     # ASCII分段器：处理纯ASCII输入
@@ -172,21 +162,20 @@ engine:
     - fallback_segmentor
     # Lua分段器：配对标点分段器
     - lua_segmentor@*pair_punct*segmentor
-  
+
   # 翻译器列表（translators）：将输入转换为候选项
   translators:
     # 标点翻译器：翻译标点符号
     - punct_translator
-    # Lua翻译器：英文→中文翻译器（支持英文单词翻译）
-    - lua_translator@*english_translator
-    # 表格翻译器：主翻译器，使用五笔码表进行翻译
+    # 码表翻译器
     - table_translator
-    # Lua翻译器：自造词翻译器（读取文本文件，即时生效，全局变量）
+    # Lua`键引导的手动造词翻译器（读取文本文件，即时生效，全局变量）
     - lua_translator@user_coined_translator
-    # 表格翻译器：用户词典翻译器（自动学习用户词组）
+    # 用户词典翻译器（自动学习用户词组）
     - table_translator@fixed
-    # 表格翻译器：`键引导的自造词临时翻译器
+    # 临时自造词翻译器
     - table_translator@mkst
+    - script_translator                    # 脚本翻译器为wubi_pinyin_filter实现重码筛选提供支持（第五码拼音首字母筛选）
     # 反查翻译器：支持拼音反查五笔编码
     - reverse_lookup_translator
     # Lua翻译器：计算器翻译器（处理 = 开头的数学表达式）
@@ -195,17 +184,21 @@ engine:
     - lua_translator@*schedule                 # 日程命令（/jc 等）
     - lua_translator@*email_suffix_translator  # 显示常用邮箱后缀
     - lua_translator@*input_statistics         # 输入统计（/tj 等）
-
-# 拼音拼写器配置（定义输入字符集和拼写规则）
+# ========================================
+# ⌨️ 拼写规则配置（Speller）
+# ========================================
 speller:
   # 字母表：定义可用的字母字符（按字母逆序排列，包含反引号用于自造词）
   alphabet: zyxwvutsrqponmlkjihgfedcba`/@=
   # 首字母：定义可作为首字母的字符
   initials: zyxwvutsrqponmlkjihgfedcba`/@=
-  # 分隔符：拼音的分隔符（空格或单引号），反引号用于自造词
-  delimiter: " '`"
-  # 最大编码长度（自造词需要较长的编码）
-  max_code_length: 10000
+  # 分隔符：仅反引号，用于自造词引导
+  delimiter: "`"
+  # 最大编码长度（自造词或者混输模式需要较长的编码）
+  max_code_length: 500                     # 长拼音输入码限制，500等同无限制
+  auto_clear: max_length                   # 超过500码自动清空
+  auto_select: false                       # 自动上屏开关
+  enable_completion: true                  # 启用编码补全：重码筛选时显示4码前缀匹配的候选
   # 拼写代数规则：定义输入转换规则
   algebra:
     # 规则1：删除匹配 "xx" 的输入（用于特殊触发）
@@ -214,8 +207,9 @@ speller:
     - abbrev/^([a-z]).+$/$1/
     # 规则3：首字母缩写规则，处理 zh、ch、sh（例如："zhang" -> "zh"）
     - abbrev/^([zcs]h).+$/$1/
-
-# 五笔翻译器配置（主翻译器，使用五笔码表）
+# ========================================
+# 📚 翻译器配置（Translators）
+# ========================================
 translator:
   # 使用的字典文件名
   dictionary: wubi.extended
@@ -240,19 +234,16 @@ translator:
   encode_commit_history: false
   # 最大词组长度：最多支持4个字的词组
   max_phrase_length: 4
-  # 是否启用联想（false=不启用，不提供词汇联想）
-  enable_completion: false
+  # 是否启用联想（true=启用，支持前缀匹配，输入3码时显示4码候选）
+  enable_completion: true
 
-# 拼音反查配置（支持用拼音反查五笔编码）
+# 拼音反查配置（用拼音查找五笔编码，混输模式下辅助输入）
 reverse_lookup:
-  dictionary: pinyin                # 反查使用的字典：拼音字典
-  preedit_format:
-    # 规则1：n/l 后的 v 转换为 ü
-    - xform/([nl])v/$1ü/
-    # 规则2：n/l 后的 ue 转换为 üe
-    - xform/([nl])ue/$1üe/
-    # 规则3：j/q/x/y 后的 v 转换为 u
-    - xform/([jqxy])v/$1u/
+  dictionary: pinyin                # 反查字典：使用拼音字典
+  preedit_format:                   # 输入显示格式转换（修正 ü 的显示）
+    - xform/([nl])v/$1ü/            # n/l 后的 v → 显示为 ü（如 nv → nü）
+    - xform/([nl])ue/$1üe/          # n/l 后的 ue → 显示为 üe（如 lve → lüe）
+    - xform/([jqxy])v/$1u/          # j/q/x/y 后的 v → 显示为 u（如 jv → ju）
 
 # 简繁转换器（支持简繁体转换）
 simplifier:
@@ -273,36 +264,12 @@ es_conversion:
   # 是否继承注释：false（不继承原文本的注释）
   inherit_comment: false
 
-# 中/英翻译转换器（中文/英文互译）
-ce_en_conversion:
-  # OpenCC配置文件：ce.json（中/英翻译转换规则）
-  opencc_config: ce.json
-  # 控制开关名：ce_trans（对应前面定义的中/英翻译转换开关）
-  option_name: ce_trans
-  # 提示：none（不显示提示信息）
-  tips: none
-  # 是否继承注释：false（不继承原文本的注释）
-  inherit_comment: false
-
 # Lua 反向数据库（用于字根和编码显示）
 lua_reverse_db:
   # 拼写反查字典：wb_spelling（五笔拼写字典）
   spelling: wb_spelling
   # 编码反查字典：wb_spelling
   code: wb_spelling
-
-# 识别器配置（定义特殊输入模式的识别规则）
-recognizer:
-  # 导入预设配置：default（使用默认的识别规则）
-  import_preset: default
-  # 识别模式列表
-  patterns:
-    # 表达式模式：匹配以=开头的数学表达式（计算器翻译器）
-    expression: "^=.*$"
-    # 自造词模式：匹配`键引导的自造词输入（例如：aa`bb 表示两个字的自造词）
-    mkst: "^[a-y]*`[a-y`]*$"
-    # 标点符号模式：匹配以/开头的数字或字母（用于调取symbol.yaml中的符号）
-    punct: "^/([0-9]0?|[A-Za-z]+)$"
 
 # 按键绑定配置（定义特殊按键和快捷键功能）
 key_binder:
@@ -330,10 +297,10 @@ key_binder:
     - {send: Page_Up, accept: minus, when: has_menu}
     # 绑定4：当有候选菜单时，等号键发送下翻页键（向下翻页）
     - {send: Page_Down, accept: equal, when: has_menu}
-    # 绑定5：正在输入时，空格键发送Esc键（取消输入）
-    - {send: Escape, accept: space, when: composing}
-    # 绑定6：当有候选菜单时，空格键保持原样（选中第一个候选项）
+    # 绑定5：当有候选菜单时，空格键保持原样（选中第一个候选项）
     - {send: space, accept: space, when: has_menu}
+    # 绑定6：正在输入时，空格键发送Esc键（取消输入）
+    - {send: Escape, accept: space, when: composing}
     # 绑定7：Ctrl+Shift+4 切换简繁体
     - {toggle: zh_trad, accept: "Control+Shift+4", when: always}
     # 绑定8：Ctrl+Shift+$ 切换简繁体（美元符号）
@@ -354,8 +321,6 @@ key_binder:
     - {when: always, accept: Shift+space, toggle: full_shape}
     # 绑定16：Ctrl+. 切换标点全半角
     - {when: always, accept: Control+period, toggle: ascii_punct}
-    # 绑定17：Ctrl+Shift+T 切换中英转换
-    - {toggle: ce_trans, accept: "Control+Shift+T", when: always}
     # 绑定17：Control+Shift+P 切换配对标点开关
     - {toggle: pair_symbol, accept: "Control+Shift+P", when: always}
     # 绑定19：分号引号上屏二三候选
@@ -420,9 +385,9 @@ fixed:
     - "^z.*$"
   enable_charset_filter: false
   enable_completion: false
-  enable_encoder: true
+  enable_encoder: false
   enable_sentence: false
-  enable_user_dict: true
+  enable_user_dict: false
   encode_commit_history: false
   initial_quality: 850                      # 降低优先级，避免错误词组永久固化
   max_phrase_length: 4
@@ -444,8 +409,27 @@ mkst:
   prefix: "`"
   tag: mkst
   tips: "〔自造词〕"
+# ========================================
+# 🔍 识别器增强：支持短码快速上屏
+# ========================================
+recognizer:
+  # 导入预设配置：default（使用默认的识别规则）
+  import_preset: default
+  # 识别模式列表
+  patterns:
+    # 表达式模式：匹配以=开头的数学表达式（计算器翻译器）
+    expression: "^=.*$"
+    # 自造词模式：匹配`键引导的自造词输入（例如：aa`bb 表示两个字的自造词）
+    mkst: "^[a-y]*`[a-y`]*$"
+    # 标点符号模式：匹配以/开头的数字或字母（用于调取symbol.yaml中的符号）
+    punct: "^/([0-9]0?|[A-Za-z]+)$"
+    # 短码识别：支持1-3码输入（一级简码、二级简码等）
+    short_code: "^[a-z]{1,3}$"
 
 # 样式配置（输入法界面样式）
 style:
   # 内联编辑：false（不使用内联编辑，显示在独立区域）
   inline_preedit: false
+wubi_pinyin_filter:            # 该段显式配置优先级高于脚本检测
+  use_key_pairs: false         # 按键对扩展：true = 14键模糊，false = 26键精确
+  use_last_char: true          # 首末字筛选：true = 末字筛选，false = 首字筛选

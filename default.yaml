@@ -18,13 +18,17 @@ switcher:                                              # 方案切换设置
     - Control+0                                        # 快捷键1：Ctrl+0
     - Control+Shift+0                                  # 快捷键2：Ctrl+Shift+0
   save_options:                                        # 保存的选项状态（重启后保留）
-    - full_shape                                       # 全角模式
-    - ascii_punct                                      # 中文标点
-    - simplification                                   # 简体中文
-    - extended_charset                                 # 扩展字符集
-    - zh_hant                                          # 繁体中文
-    - zh_hans                                          # 简体中文
-    - zh_hant_tw                                       # 台湾繁体
+    - new_phrase_pinyin                                # 词组拼音/字根拆分切换（混输专用）
+    - new_hide_code                                    # 编码（五笔码）显示控制
+    - new_spelling                                     # 字根（部件拆分）显示控制
+    - new_hide_pinyin                                  # 单字拼音显示控制
+    - GB2312                                           # 字符集控制（GB2312）
+    - pair_symbol                                      # 配对标点控制（pair_symbol）
+    - show_es                                          # Emoji表情显示控制（show_es）
+    - super_tips                                       # 超级提示控制（super_tips）
+    - zh_trad                                          # 简繁转换控制（zh_trad）
+    - full_shape                                       # 半/全角转换控制（full_shape）
+    - ascii_punct                                      # 标点符号全半角控制（ascii_punct）
   fold_options: true                                   # 折叠相似的选项（如简/繁体分组显示）
   abbreviate_options: true                             # 使用缩写显示选项
   option_list_separator: '／'                          # 选项列表分隔符

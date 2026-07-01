@@ -1,0 +1,122 @@
+# ===================================================
+# 拇指拼音输入方案 (14键布局优化版)
+# author: Liuyt151
+# date: 2026-06-23
+# ===================================================
+# 特性：
+#   - 自动继承拼音主方案所有功能
+#   - 专为拇指输入优化添加 14 键位映射（w→q, r→e... ）
+#   - 提高拇指输入效率
+# ===================================================
+
+# 🔁 继承基础方案
+__include: pinyin.schema:/
+
+schema:
+  schema_id: &schema pinyin_14
+  name: "拇指拼音"
+
+  author:
+    - Liuyt151
+    - https://github.com/liuyt151/TouchWubi
+  description: |
+    流萤
+      流光一瞬，不羡永恒。
+      萤火虽微，自照前程。
+  dependencies:
+    - wubi
+
+switches:
+  - name: ascii_mode
+    reset: 0              # 默认值为0（中文）
+    states: [ 中, 英 ]
+  - name: full_shape
+    reset: 0              # 默认值为0（半角）
+    states: [ 半角, 全角 ]
+  - name: ascii_punct
+    reset: 0              # 默认值为0（全角标点）
+    states: [ 。，, ．， ]
+  - name: zh_trad
+    reset: 0              # 默认值为0（简体）
+    states: [ 简体, 繁体 ]
+    comment: "简繁转换"
+  - name: show_es
+    reset: 0              # 默认值为0（隐藏表情）
+    states: [ 隐表, 显表 ]
+    comment: "Emoji 表情"
+
+engine:
+  processors:
+    - ascii_composer
+    - recognizer
+    - key_binder
+    - speller
+    - punctuator
+    - selector
+    - navigator
+    - express_editor
+  filters:
+    - simplifier
+    - simplifier@es_conversion
+    - uniquifier
+  segmentors:
+    - ascii_segmentor
+    - matcher
+    - abc_segmentor
+    - punct_segmentor
+    - fallback_segmentor
+  translators:
+    - punct_translator
+    - script_translator
+    - reverse_lookup_translator
+# ========================================
+# ⌨️ 拼写规则配置（Speller）
+# ========================================
+speller/+:
+  alphabet: zyxwvutsrqponmlkjihgfedcba
+  delimiter: " '"
+  algebra/+:
+# =============14键五笔映射（用于五笔拼音混输）
+    - derive/w/q/     # W 键 → 视为 Q 区（金）
+    - derive/r/e/     # R 键 → 视为 E 区（月）
+    - derive/y/t/     # Y 键 → 视为 T 区（禾）
+    - derive/i/u/     # I 键 → 视为 U 区（山）
+    - derive/p/o/     # P 键 → 视为 O 区（人）
+    - derive/s/a/     # S 键 → 视为 A 区（日）
+    - derive/f/d/     # F 键 → 视为 D 区（口）
+    - derive/h/g/     # H 键 → 视为 G 区（王）
+    - derive/k/j/     # K 键 → 视为 J 区（田）
+    - derive/c/x/     # C 键 → 视为 X 区（女）
+    - derive/b/v/     # B 键 → 视为 V 区（已）
+    - derive/m/n/     # M 键 → 视为 N 区（力）
+# =============通配符规则（用于模糊五笔输入）
+translator:
+  dictionary: pinyin
+  prism: *schema
+  preedit_format:
+    - xform/([nl])v/$1ü/
+    - xform/([nl])ue/$1üe/
+    - xform/([jqxy])v/$1u/
+
+punctuator:
+  import_preset: symbols
+
+key_binder:
+  import_preset: default
+
+recognizer:
+  import_preset: default
+  patterns:
+    punct: '^/([0-9]0?|[A-Za-z]+)$'
+    reverse_lookup: "^z[a-z]*'?$"
+
+# 简繁转换器
+simplifier:
+  opencc_config: s2t.json
+  option_name: zh_trad
+
+# Emoji 表情转换器
+es_conversion:
+  opencc_config: es.json
+  option_name: show_es
+  tips: none
