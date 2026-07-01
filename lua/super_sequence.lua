@@ -1,21 +1,31 @@
--- 万象拼音方案新成员：手动自由排序
+-- 万象拼音方案新成员：手动自由排序 + 自动词频排序（支持PC端快捷键 + 移动端数字键）
 -- 数据存放于 userdb 中，处于性能考量，此排序仅影响当前输入码
--- ctrl+j 前移
--- ctrl+k 后移
--- ctrl/l 重置
--- ctrl+p 置顶
--- /txql 清除所有调序记录
+--
+-- 【PC端快捷键】
+--   Ctrl+J  前移当前高亮候选一位
+--   Ctrl+K  后移当前高亮候选一位
+--   Ctrl+L  重置当前编码的所有调序记录（恢复默认顺序）
+--   Ctrl+P  置顶当前高亮候选
+--
+-- 【移动端数字键】（Trime / Hamster 等，需启用下滑数字）
+--   数字键 2-9  前移对应序号的候选（例如 3 将第3候选前移一位）
+--   数字键 0    前移第10候选
+--   数字键 1    撤销上次调序操作（仅对当前编码有效）
+--
+-- 【其他命令】
+--   /txql   清除所有调序记录（清空整个数据库）
 --
 -- 【方案配置说明】
--- 本脚本包含处理器(P)和过滤器(F)，需在 schema.yaml 中添加以下配置：
+-- 本脚本包含处理器(P)和过滤器(F、S)，需在 schema.yaml 中添加相应配置：
 --
 -- engine:
 --   processors:
---     - lua_processor@*super_sequence*P       # 超序列处理器（处理 Ctrl+J/K/L/P）
+--     - lua_processor@*super_sequence*P       # 处理器：处理 Ctrl+J/K/L/P 及移动端数字键
 --   filters:
---     - lua_filter@*super_sequence*F          # 超序列过滤器（调整候选项顺序）
+--     - lua_filter@*super_sequence*F          # 过滤器：应用手动调序记录（调整候选项顺序）
+--     - lua_filter@*super_sequence*S          # 过滤器：自动按词频排序（基于 quality 降序，可选）
 --
--- key_binder:                                  # 按键绑定配置（可选，默认使用 Ctrl+J/K/L/P）
+-- key_binder:                                  # 按键绑定配置（可选，仅影响 PC 端 Ctrl 快捷键）
 --   sequence:
 --     up: "Control+j"                         # 前移
 --     down: "Control+k"                       # 后移
@@ -26,6 +36,12 @@
 --   - 检测 Ctrl 键组合（key_event:ctrl()）
 --   - is_function_mode_active() 排除功能模式
 --   - 输入 "/txql" 触发清空数据库
+--   - 移动端自动检测并启用数字键调序
+--
+-- 注意：
+--   - S 过滤器（自动词频排序）为可选组件，若不需要可省略。
+--   - 若同时使用 F 和 S，建议先执行 S（词频排序），再执行 F（手动调序），
+--     以确保手动调序覆盖自动排序结果（顺序由 filters 列表顺序决定）。
 
 -- 内部常量定义（从 wanxiang.lua 提取）
 local RIME_PROCESS_RESULTS = {
@@ -57,6 +73,115 @@ local function is_ios_device()
     return os.getenv("HOME") and os.getenv("HOME"):find("/var/mobile/") ~= nil
 end
 
+-- 检测是否为移动端（Trime / Hamster / 超越输入法等）
+-- 自动检测是否为移动设备（智能平台检测）
+-- 支持的输入法：同文(Trime)、仓(Hamster)、超越输入法(Beyond)、鸿蒙系统等
+local function is_mobile_device()
+    -- 获取路径（支持 rime_api 和回退到环境变量）
+    local user_data_dir = ""
+    local shared_data_dir = ""
+    local dist = ""
+    local dist_name = ""
+
+    if rime_api then
+        user_data_dir = rime_api.get_user_data_dir() or ""
+        shared_data_dir = rime_api.get_shared_data_dir() or ""
+        dist = rime_api.get_distribution_code_name() or ""
+        dist_name = rime_api.get_distribution_name() or ""
+    end
+
+    local lower_dist = dist:lower()
+    local dist_name_lower = dist_name:lower()
+    local lower_path = user_data_dir:lower()
+    local sys_lower_path = shared_data_dir:lower()
+    local home = (os.getenv("HOME") or ""):lower()
+
+    -- 1. 已知移动端输入法（distribution_code_name）
+    if lower_dist == "trime" or
+        lower_dist == "hamster" or
+        lower_dist == "hamster3" then
+        return true
+    end
+
+    -- 2. 超越输入法检测（RimeAPI + /space/ 路径）
+    if dist_name_lower == "rimeapi" and
+        (lower_path:find("/space/") or sys_lower_path:find("/space/")) then
+        return true
+    end
+
+    -- 3. 通用移动路径关键词（Android/iOS/macOS）
+    local mobile_keywords = {"/android/", "/mobile/", "/sdcard/", "/storage/emulated/",
+                             "applications", "library"}
+    for _, kw in ipairs(mobile_keywords) do
+        if lower_path:find(kw) or sys_lower_path:find(kw) then
+            return true
+        end
+    end
+
+    -- 4. 鸿蒙系统路径特征（HarmonyOS / HarmonyOS NEXT）
+    -- 4.1 传统鸿蒙路径标识
+    if lower_path:find("/harmony/") or
+        lower_path:find("/hap/") or
+        lower_path:find("/harmonyos/") or
+        lower_path:find("/openharmony/") or
+        sys_lower_path:find("/harmony/") or
+        sys_lower_path:find("/hap/") then
+        return true
+    end
+
+    -- 4.2 鸿蒙沙箱存储路径（el数字 是鸿蒙特有，/data/storage/ 是 Android/鸿蒙共有）
+    if lower_path:find("/data/storage/el%d+") or
+        sys_lower_path:find("/data/storage/el%d+") then
+        return true
+    end
+
+    -- 4.3 鸿蒙 bundle 路径（应用资源目录）
+    if lower_path:find("/bundle/") or sys_lower_path:find("/bundle/") then
+        return true
+    end
+
+    -- 4.4 鸿蒙用户目录特征（/storage/Users/）
+    if lower_path:find("/storage/users/") or
+        sys_lower_path:find("/storage/users/") or
+        home:find("/storage/users/") then
+        return true
+    end
+
+    -- 4.5 超越输入法 + 鸿蒙组合检测
+    if dist_name_lower == "rimeapi" and
+        (lower_path:find("/data/storage/el%d+") or
+         lower_path:find("/space/") or
+         home:find("/storage/users/")) then
+        return true
+    end
+
+    -- 5. JIT 平台检测（Android/HarmonyOS）
+    if jit and jit.os then
+        local os_name = jit.os:lower()
+        if os_name:find("android") or os_name:find("harmony") then
+            return true
+        end
+    end
+
+    -- 6. 环境变量检测
+    if os.getenv("HMOS") or os.getenv("HARMONYOS") then
+        return true
+    end
+
+    -- 7. iOS 路径检测
+    if home:find("/var/mobile/") then
+        return true
+    end
+
+    -- 8. HOME 目录回退检测（Android 兜底）
+    if home:find("/storage/emulated/") then return true end
+    if home:find("/data/data/") then return true end
+
+    return false
+end
+
+local MOBILE_MODE = is_mobile_device()
+
 ---@type string | nil 当前选中的键，命令模式为 0 开始的位置索引，正常模式为候选词
 local cur_adjustment_phrase = nil
 
@@ -72,6 +197,17 @@ local cur_adjust_offset = 0
 
 ---@type boolean 是否处于 pin 模式
 local in_pin_mode = false
+
+---@type integer | nil 数字键置顶的候选索引（1-indexed），nil 表示无待处理置顶
+--- 1 = 撤销，2-9/0 = 前移对应候选
+local pin_candidate_index = nil
+
+---@type table | nil 上次调序记录 { code, text, from_position }，用于撤销
+local last_adjustment = nil
+
+---@type table<string, table> 移动端会话内候选顺序追踪 { [code] = {text1, text2, ...} }
+--- 避免 S 排序覆盖手动调序结果
+local mobile_candidate_order = {}
 
 -- 添加一个标记，用于跟踪是否需要导出
 local need_export = false
@@ -350,46 +486,78 @@ end
 ---@return ProcessResult
 function P.func(key_event, env)
     local context = env.engine.context
+
+    if key_event:release() then
+        return RIME_PROCESS_RESULTS.kNoop
+    end
+
+    -- 移动端数字键调序（PC端数字正常上屏）
+    if MOBILE_MODE and context:has_menu() then
+        local keycode = key_event.keycode
+
+        -- 数字键 1：撤销上次调序（移动端下滑数字）
+        if keycode == 0x31 then
+            pin_candidate_index = 1  -- 1 表示撤销
+            context:refresh_non_confirmed_composition()
+            return RIME_PROCESS_RESULTS.kAccepted
+        end
+
+        -- 数字键 2-9：有候选菜单时前移对应候选
+        if keycode >= 0x32 and keycode <= 0x39 then
+            pin_candidate_index = keycode - 0x30  -- 1-indexed
+            context:refresh_non_confirmed_composition()
+            return RIME_PROCESS_RESULTS.kAccepted
+        end
+
+        -- 数字键 0：前移第10候选
+        if keycode == 0x30 then
+            pin_candidate_index = 10
+            context:refresh_non_confirmed_composition()
+            return RIME_PROCESS_RESULTS.kAccepted
+        end
+    end
+
+    if not context:has_menu() then
+        return RIME_PROCESS_RESULTS.kNoop
+    end
+
     local selected_cand = context:get_selected_candidate()
-    local segment = context.composition:back()
-
-    if not context:has_menu()
-        or selected_cand == nil
-        or selected_cand.text == nil
-        or not key_event:ctrl()
-        or key_event:release()
-    then
+    if selected_cand == nil or selected_cand.text == nil then
         return RIME_PROCESS_RESULTS.kNoop
     end
 
-    if is_function_mode_active(context)
-        and not context:get_property("sequence_adjustment_code")
-    then
-        log.warning(string.format("[sequence] 暂不支持当前指令的手动排序"))
-        return RIME_PROCESS_RESULTS.kNoop
+    -- 桌面端：Ctrl+J/K/L/P（保留原有行为）
+    if key_event:ctrl() then
+        if is_function_mode_active(context)
+            and not context:get_property("sequence_adjustment_code")
+        then
+            log.warning(string.format("[sequence] 暂不支持当前指令的手动排序"))
+            return RIME_PROCESS_RESULTS.kNoop
+        end
+
+        local kc = key_event.keycode   -- 修复：在此处定义局部变量，避免与移动端 keycode 作用域混淆
+        in_pin_mode = kc == 0x70
+        if kc == 0x6A then
+            cur_adjust_offset = -1
+        elseif kc == 0x6B then
+            cur_adjust_offset = 1
+        elseif kc == 0x6C then
+            cur_adjust_offset = nil
+        elseif in_pin_mode then
+            cur_adjust_offset = nil
+        else
+            return RIME_PROCESS_RESULTS.kNoop
+        end
+
+        if cur_adjust_offset == 0 then
+            return RIME_PROCESS_RESULTS.kNoop
+        end
+
+        process_adjustment(context)
+        return RIME_PROCESS_RESULTS.kAccepted
     end
 
-    -- 判断按下的键，更新偏移量
-    in_pin_mode = key_event.keycode == 0x70
-    if key_event.keycode == 0x6A then     -- 前移
-        cur_adjust_offset = -1
-    elseif key_event.keycode == 0x6B then -- 后移
-        cur_adjust_offset = 1
-    elseif key_event.keycode == 0x6C then -- 重置
-        cur_adjust_offset = nil
-    elseif in_pin_mode then               -- 置顶
-        cur_adjust_offset = nil
-    else
-        return RIME_PROCESS_RESULTS.kNoop
-    end
-
-    if cur_adjust_offset == 0 then -- 未有移动操作，不用操作
-        return RIME_PROCESS_RESULTS.kNoop
-    end
-
-    process_adjustment(context)
-
-    return RIME_PROCESS_RESULTS.kAccepted
+    return RIME_PROCESS_RESULTS.kNoop
 end
 
 local F = {}
@@ -414,6 +582,109 @@ function F.func(input, env)
         return
     end
 
+    -- 处理数字键调序操作（移动端下滑数字）
+    -- pin_candidate_index = 1: 撤销, 2-10: 前移对应候选
+    if pin_candidate_index then
+        local pin_idx = pin_candidate_index
+        pin_candidate_index = nil
+
+        local code = extract_adjustment_code(context)
+        local is_func_mode = is_function_mode_active(context)
+
+        -- 收集候选（去重）
+        local candidates = {}
+        local phrase_count = {}
+        for cand in input:iter() do
+            local text = cand.text
+            phrase_count[text] = (phrase_count[text] or 0) + 1
+            if phrase_count[text] == 1 then
+                table.insert(candidates, cand)
+            end
+        end
+
+        -- 应用数据库中已有的全部调序记录
+        local user_adjustment = get_adjustment(code)
+        if user_adjustment then
+            -- 为每个记录绑定候选及其当前原始位置
+            for pos, cand in ipairs(candidates) do
+                local key = is_func_mode and tostring(pos - 1) or cand.text
+                if user_adjustment[key] then
+                    user_adjustment[key].candidate = cand
+                    user_adjustment[key].from_position = pos
+                end
+            end
+            -- 按时间排序，逐个应用
+            local list = {}
+            for _, info in pairs(user_adjustment) do
+                if info.candidate then
+                    table.insert(list, info)
+                end
+            end
+            table.sort(list, function(a, b) return a.updated_at < b.updated_at end)
+            for _, record in ipairs(list) do
+                if record.from_position and record.from_position ~= record.to_position then
+                    local from = record.from_position
+                    local to = record.to_position
+                    table.remove(candidates, from)
+                    table.insert(candidates, to, record.candidate)
+                    -- 修正其他记录的 from_position（因为数组移位）
+                    for _, r in ipairs(list) do
+                        if r.from_position then
+                            local minp = math.min(from, to)
+                            local maxp = math.max(from, to)
+                            if minp <= r.from_position and r.from_position <= maxp then
+                                r.from_position = r.from_position + (to < from and 1 or -1)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        -- 执行数字键移动
+        if pin_idx == 1 then
+            -- 撤销：恢复上次调序的候选到原位置
+            if last_adjustment and last_adjustment.code == code then
+                for i, cand in ipairs(candidates) do
+                    if cand.text == last_adjustment.text then
+                        local moved = table.remove(candidates, i)
+                        local target = math.min(last_adjustment.from_position, #candidates + 1)
+                        table.insert(candidates, target, moved)
+                        -- 保存新位置（实际上恢复）
+                        local key = is_func_mode and tostring(target - 1) or moved.text
+                        save_adjustment(code, key, target)
+                        break
+                    end
+                end
+                last_adjustment = nil
+            end
+        elseif pin_idx >= 2 and pin_idx <= #candidates then
+            -- 前移一位
+            local moved = table.remove(candidates, pin_idx)
+            local new_pos = pin_idx - 1
+            table.insert(candidates, new_pos, moved)
+            local key = is_func_mode and tostring(new_pos - 1) or moved.text
+            save_adjustment(code, key, new_pos)
+            last_adjustment = { code = code, text = moved.text, from_position = pin_idx }
+        end
+
+        -- 更新会话内顺序缓存（用于快速恢复，但本分支已从数据库读取，缓存仅作辅助）
+        local new_order = {}
+        for _, cand in ipairs(candidates) do
+            table.insert(new_order, cand.text)
+        end
+        mobile_candidate_order[code] = new_order
+
+        -- 输出结果
+        for _, cand in ipairs(candidates) do yield(cand) end
+        return
+    end
+
+    -- 非调序路径：常规候选输出，需应用数据库记录
+    -- 清除移动端会话状态（编码变化或上屏后撤销不应再有效）
+    mobile_candidate_order = {}
+    last_adjustment = nil
+
     local adjust_code = extract_adjustment_code(context)
     local user_adjustment = get_adjustment(adjust_code)
 
@@ -422,78 +693,63 @@ function F.func(input, env)
         and cur_adjust_offset ~= nil
         and adjust_code ~= ""
 
-    if not has_unsaved_adjustment  -- 如果当前没有排序调整
-        and user_adjustment == nil -- 并且之前也没有自定义排序
-    then                           -- 直接 yield 并返回
-        for cand in input:iter() do yield(cand) end
-        return
-    end
-
-    ---@type table<Candidate>
-    local candidates = {}     -- 去重排序后的候选列表
-
-    local phrase_count = {}   -- 用于去重
-    local dedupe_position = 1 -- 记录去重会的当前索引位置
+    -- 收集候选（去重）
+    local candidates = {}
+    local phrase_count = {}
+    local dedupe_position = 1
     local cur_candidate = nil
     local cur_raw_index = nil
-
     local is_func_mode = is_function_mode_active(context)
+
     for cand in input:iter() do
         local text = cand.text
-
         phrase_count[text] = (phrase_count[text] or 0) + 1
-
-        if phrase_count[text] == 1 then -- 都需要去重
-            -- 依次插入得到去重后的列表
+        if phrase_count[text] == 1 then
             table.insert(candidates, cand)
-
             if cur_adjustment_phrase == text then
                 cur_candidate = cand
                 cur_raw_index = dedupe_position - 1
             end
-
-            local user_adjustment_key = is_func_mode and tostring(dedupe_position - 1) or text
-            if user_adjustment and user_adjustment[user_adjustment_key] ~= nil then
-                user_adjustment[user_adjustment_key].candidate = cand
-                user_adjustment[user_adjustment_key].from_position = dedupe_position
+            local adjust_key = is_func_mode and tostring(dedupe_position - 1) or text
+            if user_adjustment and user_adjustment[adjust_key] then
+                user_adjustment[adjust_key].candidate = cand
+                user_adjustment[adjust_key].from_position = dedupe_position
             end
-
             dedupe_position = dedupe_position + 1
         end
     end
 
-    -- 获取当前输入码的自定义排序项数组，并按操作时间从前到后手动排序
-    local user_adjustment_list = {}
+    -- 应用数据库中的调序记录（如果有）
     if user_adjustment ~= nil then
+        local list = {}
         for _, info in pairs(user_adjustment) do
             if info.candidate then
-                table.insert(user_adjustment_list, info)
+                table.insert(list, info)
             end
         end
-        table.sort(user_adjustment_list, function(a, b) return a.updated_at < b.updated_at end)
-
-        -- 恢复至上次调整状态
-        for _, record in ipairs(user_adjustment_list) do
-            if record.from_position ~= record.to_position then
-                local from_position, to_position = record.from_position, record.to_position
-                table.remove(candidates, from_position)
-                table.insert(candidates, to_position, record.candidate)
-                -- 修正由于移位导致的 from_position 变动
-                for idx, r in ipairs(user_adjustment_list) do
-                    local is_move_top = to_position < from_position
-                    local min_position = is_move_top and to_position or from_position
-                    local max_position = is_move_top and from_position or to_position
-                    if min_position <= r.from_position and r.from_position <= max_position then
-                        user_adjustment_list[idx].from_position = r.from_position + (is_move_top and 1 or -1)
+        table.sort(list, function(a, b) return a.updated_at < b.updated_at end)
+        for _, record in ipairs(list) do
+            if record.from_position and record.from_position ~= record.to_position then
+                local from = record.from_position
+                local to = record.to_position
+                table.remove(candidates, from)
+                table.insert(candidates, to, record.candidate)
+                -- 修正其他记录的 from_position
+                for _, r in ipairs(list) do
+                    if r.from_position then
+                        local minp = math.min(from, to)
+                        local maxp = math.max(from, to)
+                        if minp <= r.from_position and r.from_position <= maxp then
+                            r.from_position = r.from_position + (to < from and 1 or -1)
+                        end
                     end
                 end
             end
         end
     end
 
-    -- 应用当前调整
+    -- 应用当前调整（Ctrl+J/K/L/P 产生的）
     if has_unsaved_adjustment then
-        ---@type integer | nil
         local from_position = nil
         for position, cand in ipairs(candidates) do
             if cand.text == cur_adjustment_phrase then
@@ -504,20 +760,16 @@ function F.func(input, env)
 
         if from_position ~= nil then
             local to_position = from_position + cur_adjust_offset
+            if to_position < 1 then
+                to_position = 1
+            elseif to_position > #candidates then
+                to_position = #candidates
+            end
 
             if from_position ~= to_position then
-                if to_position < 1 then
-                    to_position = 1
-                elseif to_position > #candidates then
-                    to_position = #candidates
-                end
-
                 table.remove(candidates, from_position)
                 table.insert(candidates, to_position, cur_candidate)
-
-                local adjust_key = is_function_mode_active(context)
-                    and cur_raw_index
-                    or cur_adjustment_phrase
+                local adjust_key = is_func_mode and cur_raw_index or cur_adjustment_phrase
                 if adjust_key then
                     save_adjustment(adjust_code, adjust_key, to_position)
                     cur_highlight_idx = to_position - 1
@@ -526,12 +778,19 @@ function F.func(input, env)
         end
     end
 
+    -- 更新会话内顺序缓存（用于移动端数字键分支快速读取，但不再依赖它）
+    local new_order = {}
+    for _, cand in ipairs(candidates) do
+        table.insert(new_order, cand.text)
+    end
+    mobile_candidate_order[adjust_code] = new_order
+
     -- 输出最终结果
     for _, cand in ipairs(candidates) do
         yield(cand)
     end
 
-    -- 在filter处理完成后重置状态
+    -- 在filter处理完成后重置临时状态
     if has_unsaved_adjustment then
         cur_adjustment_phrase = nil
         cur_highlight_idx = nil
@@ -540,4 +799,28 @@ function F.func(input, env)
     end
 end
 
-return { P = P, F = F }
+-- ============================================================
+-- 自动词频排序（通用版）
+-- 适用于任意键位布局（26键、14键、18键等）
+-- ============================================================
+local MAX_CANDIDATES = 200
+
+local function sorter(input, env)
+    local input_len = #(env.engine.context.input or "")
+    -- 1码时仅限制候选数量，不排序（简码候选无需排序，用户会继续输入第二码）
+    local limit = (input_len <= 1) and 50 or MAX_CANDIDATES
+
+    local candidates = {}
+    for cand in input:iter() do
+        if #candidates >= limit then break end
+        table.insert(candidates, cand)
+    end
+    if input_len > 1 and #candidates > 1 then
+        table.sort(candidates, function(a, b) return (a.quality or 0) > (b.quality or 0) end)
+    end
+    for _, cand in ipairs(candidates) do yield(cand) end
+end
+
+local S = { func = sorter }
+
+return { P = P, F = F, S = S }

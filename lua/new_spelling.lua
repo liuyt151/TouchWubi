@@ -218,56 +218,70 @@ local function get_tricomment(cand, env)
     local hide_code = env.engine.context:get_option("new_hide_code")          -- 显码/隐码
     local show_phrase_pinyin = env.is_mixed and env.engine.context:get_option(phrase_pinyin_keyword) or false  -- 显声/隐声（仅混输有效）
 
-    local spll_raw = env.spll_rvdb:lookup(ctext)
-    if spll_raw == '' then return '' end
-
-    local spelling = xform(spll_raw:gsub('%[(.-),(.-),(.-),(.-)%]', '[%1]'))      -- 字根
-    local pinyin = xform(spll_raw:gsub('%[(.-),(.-),(.-),(.-)%]', '[%3]'))        -- 拼音
-    local code = xform(spll_raw:gsub('%[(.-),(.-),(.-),(.-)%]', '[%2]'))           -- 编码
-
     -- 单字处理
     if utf8.len(ctext) == 1 then
+        local spll_raw = env.spll_rvdb:lookup(ctext)
+        if spll_raw == '' then return '' end
+
+        local spelling = xform(spll_raw:gsub('%[(.-),(.-),(.-),(.-)%]', '%1')):gsub('^%s*(.-)%s*$', '%1')
+        local pinyin = xform(spll_raw:gsub('%[(.-),(.-),(.-),(.-)%]', '%3')):gsub('^%s*(.-)%s*$', '%1')
+        local code = xform(spll_raw:gsub('%[(.-),(.-),(.-),(.-)%]', '%2')):gsub('^%s*(.-)%s*$', '%1')
+
         if env.is_mixed and show_phrase_pinyin then
-            return pinyin   -- 混输"显声"模式单字只显拼音
+            return '〈' .. pinyin .. '〉'   -- 混输"显声"模式单字只显拼音
         end
 
-        if show_spelling then   -- 显根：包含字根
-            local parts = {spelling}
-            if not hide_pinyin then table.insert(parts, pinyin) end
-            if not hide_code then table.insert(parts, code) end
-            return table.concat(parts, ' · ')
-        else                    -- 隐根：不包含字根
-            local parts = {}
-            if not hide_pinyin then table.insert(parts, pinyin) end
-            if not hide_code then table.insert(parts, code) end
-            if #parts > 0 then return table.concat(parts, ' · ') else return '' end
-        end
+        local parts = {}
+        if not hide_pinyin then table.insert(parts, '〈' .. pinyin .. '〉') end
+        if show_spelling then table.insert(parts, '〈' .. spelling .. '〉') end
+        if not hide_code then table.insert(parts, '〈' .. code .. '〉') end
+        if #parts > 0 then return table.concat(parts, '·') else return '' end
     -- 词组处理
     else
-        -- 混输且显声模式：显示词组拼音
-        if env.is_mixed and show_phrase_pinyin then
-            local chars = utf8chars(ctext)
-            local pinyins = {}
-            local has_valid_pinyin = false
-            for i = 1, #chars do
-                local char_raw = env.spll_rvdb:lookup(chars[i])
-                if char_raw ~= '' then
-                    local char_pinyin = xform(char_raw:gsub('%[(.-),(.-),(.-),(.-)%]', '[%3]'))
-                    table.insert(pinyins, char_pinyin)
-                    has_valid_pinyin = true
-                end
+        local chars = utf8chars(ctext)
+        local parts = {}
+
+        -- 逐字查询拼音
+        local pinyins = {}
+        local has_valid_pinyin = false
+        for i = 1, #chars do
+            local char_raw = env.spll_rvdb:lookup(chars[i])
+            if char_raw ~= '' then
+                local char_pinyin = xform(char_raw:gsub('%[(.-),(.-),(.-),(.-)%]', '%3')):gsub('^%s*(.-)%s*$', '%1')
+                table.insert(pinyins, char_pinyin)
+                has_valid_pinyin = true
             end
-            if has_valid_pinyin then
-                local pinyin_str = table.concat(pinyins, ' · ')
-                return '〈 ' .. pinyin_str .. ' 〉'
+        end
+        local pinyin_str = has_valid_pinyin and table.concat(pinyins, '·') or ''
+
+        -- 混输显声模式：只显示拼音
+        if env.is_mixed and show_phrase_pinyin then
+            if pinyin_str ~= '' then
+                return '〈' .. pinyin_str .. '〉'
+            end
+            return ''
+        end
+
+        -- 纯五笔或混输隐声模式：根据开关组合显示，顺序：拼音 → 字根 → 编码
+        if not hide_pinyin and pinyin_str ~= '' then
+            table.insert(parts, '〈' .. pinyin_str .. '〉')
+        end
+        if show_spelling then
+            local phrase_spelling = spell_phrase(ctext, env.spll_rvdb)
+            if phrase_spelling ~= '' then
+                phrase_spelling = phrase_spelling:gsub('{(.-)}', '<%1>')
+                table.insert(parts, '〈' .. phrase_spelling .. '〉')
+            end
+        end
+        if not hide_code then
+            local phrase_code = get_en_code(ctext, env.spll_rvdb)
+            if phrase_code ~= '' then
+                table.insert(parts, '〈' .. phrase_code .. '〉')
             end
         end
 
-        -- 纯五笔 或 混输隐声模式：显示词组字根拆分
-        local phrase_spelling = spell_phrase(ctext, env.spll_rvdb)
-        if phrase_spelling ~= '' then
-            phrase_spelling = phrase_spelling:gsub('{(.-)}', '<%1>')
-            return '〈 ' .. phrase_spelling .. ' 〉'
+        if #parts > 0 then
+            return table.concat(parts, '·')
         end
     end
 
@@ -354,10 +368,9 @@ local function filter(input, env)
                     if env.is_mixed and is_pinyin_input then
                         local add_comment = get_tricomment(cand, env)
                         if add_comment ~= nil and add_comment ~= "" then
-                            yield(Candidate("pinyin_spelling", cand.start, cand._end, cand.text, add_comment))
-                        else
-                            yield(cand)
+                            cand.comment = add_comment
                         end
+                        yield(cand)
                     -- 简繁转换器特殊命名空间处理
                     elseif cand.type == 'simplifier' and env.name_space == 'new_for_rvlk' then
                         if cand.comment == "" then
@@ -367,28 +380,17 @@ local function filter(input, env)
                     -- 普通候选项处理
                     else
                         -- z键或/键引导的反查/命令输入
-                        if script_text:find("^z[a-z]*") and not script_text:find("%p$") or
+                        if script_text:find("^z[%a%/]*") and not script_text:find("%p$") or
                            script_text:find("^([%/])[a-z]*") and not script_text:find("%p$") then
                             local add_comment = get_tricomment(cand, env)
                             local code_comment = env.code_rvdb:lookup(cand.text)
 
                             if add_comment ~= nil and add_comment ~= "" then
-                                if cand.comment == "" then
-                                    yield(Candidate(spelling_keyword, cand.start, cand._end, cand.text, add_comment))
+                                if cand.comment:find("(☯)") then
+                                    segment.prompt = "〈编码：" .. get_en_code(cand.text, env.spll_rvdb) .. "〉"
+                                    yield(cand)
                                 else
-                                    if cand.comment:find("(☯)") then
-                                        segment.prompt = "〈编码：" .. get_en_code(cand.text, env.spll_rvdb) .. "〉"
-                                        yield(cand)
-                                    else
-                                        if utf8.len(cand.text) == 1 and code_comment and not hide_pinyin then
-                                            -- [修复] 恢复完整三重注解：字根 · 编码 · 拼音
-                                            yield(Candidate(spelling_keyword, cand.start, cand._end, cand.text,
-                                                xform(code_comment:gsub('%[(.-),(.-),(.-),(.-)%]', '[%1'..' · '..'%2'..' · '..'%3]'))))
-                                        else
-                                            yield(Candidate(spelling_keyword, cand.start, cand._end, cand.text,
-                                                add_comment:gsub("〉"," · ") .. cand.comment .. " 〉"))
-                                        end
-                                    end
+                                    yield(Candidate(spelling_keyword, cand.start, cand._end, cand.text, add_comment))
                                 end
                             else
                                 yield(cand)
@@ -403,8 +405,11 @@ local function filter(input, env)
                             end
 
                             if cand.type == 'punct' then
-                                add_comment = xform(code_comment:gsub('%[(.-),(.-),(.-),(.-)%]', '[%1'..' · '..'%2'..' · '..'%3]'))
-                            elseif cand.type ~= 'sentence' then
+                                local pinyin = xform(code_comment:gsub('%[(.-),(.-),(.-),(.-)%]', '%3')):gsub('^%s*(.-)%s*$', '%1')
+                                local spelling = xform(code_comment:gsub('%[(.-),(.-),(.-),(.-)%]', '%1')):gsub('^%s*(.-)%s*$', '%1')
+                                local code = xform(code_comment:gsub('%[(.-),(.-),(.-),(.-)%]', '%2')):gsub('^%s*(.-)%s*$', '%1')
+                                add_comment = '〈' .. pinyin .. '〉·〈' .. spelling .. '〉·〈' .. code .. '〉'
+                            else
                                 if cand.comment == "" then
                                     add_comment = get_tricomment(cand, env)
                                 end
@@ -436,13 +441,13 @@ local function filter(input, env)
                         for i = 1, #chars do
                             local char_raw = env.spll_rvdb:lookup(chars[i])
                             if char_raw ~= '' then
-                                local char_pinyin = xform(char_raw:gsub('%[(.-),(.-),(.-),(.-)%]', '[%3]'))
+                                local char_pinyin = xform(char_raw:gsub('%[(.-),(.-),(.-),(.-)%]', '%3')):gsub('^%s*(.-)%s*$', '%1')
                                 table.insert(pinyins, char_pinyin)
                                 has_valid_pinyin = true
                             end
                         end
                         if has_valid_pinyin then
-                            cand.comment = '〈 ' .. table.concat(pinyins, ' · ') .. ' 〉'
+                            cand.comment = '〈' .. table.concat(pinyins, '·') .. '〉'
                         else
                             cand.comment = ""
                         end
@@ -451,28 +456,53 @@ local function filter(input, env)
                         -- 混输显声：单字拼音
                         local code_comment = env.code_rvdb:lookup(cand.text)
                         if code_comment ~= "" then
-                            cand.comment = xform(code_comment:gsub('%[(.-),(.-),(.-),(.-)%]', '[%3]'))
+                            local pinyin = xform(code_comment:gsub('%[(.-),(.-),(.-),(.-)%]', '%3')):gsub('^%s*(.-)%s*$', '%1')
+                            cand.comment = '〈' .. pinyin .. '〉'
                         else
                             cand.comment = ""
                         end
                         yield(cand)
                     else
-                        -- z键反查：强制显示完整三重注解（字根+编码+拼音），方便学习
-                        local code_comment = env.code_rvdb:lookup(cand.text)
-                        if code_comment ~= "" and utf8.len(cand.text) == 1 then
-                            -- 单字：显示字根 · 编码 · 拼音
-                            cand.comment = xform(code_comment:gsub('%[(.-),(.-),(.-),(.-)%]', '[%1'..' · '..'%2'..' · '..'%3]'))
-                        elseif code_comment ~= "" and utf8.len(cand.text) > 1 then
-                            -- 词组：显示字根拆分
-                            local phrase_spelling = spell_phrase(cand.text, env.spll_rvdb)
-                            if phrase_spelling ~= '' then
-                                phrase_spelling = phrase_spelling:gsub('{(.-)}', '<%1>')
-                                cand.comment = '〈 ' .. phrase_spelling .. ' 〉'
+                        -- z键反查：强制显示完整三重注解（拼音+字根+编码），方便学习
+                        if utf8.len(cand.text) == 1 then
+                            -- 单字：显示拼音·字根·编码
+                            local code_comment = env.code_rvdb:lookup(cand.text)
+                            if code_comment ~= "" then
+                                local pinyin = xform(code_comment:gsub('%[(.-),(.-),(.-),(.-)%]', '%3')):gsub('^%s*(.-)%s*$', '%1')
+                                local spelling = xform(code_comment:gsub('%[(.-),(.-),(.-),(.-)%]', '%1')):gsub('^%s*(.-)%s*$', '%1')
+                                local code = xform(code_comment:gsub('%[(.-),(.-),(.-),(.-)%]', '%2')):gsub('^%s*(.-)%s*$', '%1')
+                                cand.comment = '〈' .. pinyin .. '〉·〈' .. spelling .. '〉·〈' .. code .. '〉'
                             else
                                 cand.comment = ""
                             end
                         else
-                            cand.comment = ""
+                            -- 词组：显示拼音·字根·编码（逐字查询）
+                            local chars = utf8chars(cand.text)
+                            local pinyins = {}
+                            local has_valid_pinyin = false
+                            for i = 1, #chars do
+                                local char_raw = env.spll_rvdb:lookup(chars[i])
+                                if char_raw ~= '' then
+                                    local char_pinyin = xform(char_raw:gsub('%[(.-),(.-),(.-),(.-)%]', '%3')):gsub('^%s*(.-)%s*$', '%1')
+                                    table.insert(pinyins, char_pinyin)
+                                    has_valid_pinyin = true
+                                end
+                            end
+                            local pinyin_str = has_valid_pinyin and table.concat(pinyins, '·') or ''
+                            local phrase_spelling = spell_phrase(cand.text, env.spll_rvdb)
+                            local phrase_code = get_en_code(cand.text, env.spll_rvdb)
+                            local parts = {}
+                            if pinyin_str ~= '' then table.insert(parts, '〈' .. pinyin_str .. '〉') end
+                            if phrase_spelling ~= '' then
+                                phrase_spelling = phrase_spelling:gsub('{(.-)}', '<%1>')
+                                table.insert(parts, '〈' .. phrase_spelling .. '〉')
+                            end
+                            if phrase_code ~= '' then table.insert(parts, '〈' .. phrase_code .. '〉') end
+                            if #parts > 0 then
+                                cand.comment = table.concat(parts, '·')
+                            else
+                                cand.comment = ""
+                            end
                         end
                         yield(cand)
                     end
@@ -493,42 +523,55 @@ local function filter(input, env)
                         for i = 1, #chars do
                             local char_raw = env.spll_rvdb:lookup(chars[i])
                             if char_raw ~= '' then
-                                local char_pinyin = xform(char_raw:gsub('%[(.-),(.-),(.-),(.-)%]', '[%3]'))
+                                local char_pinyin = xform(char_raw:gsub('%[(.-),(.-),(.-),(.-)%]', '%3')):gsub('^%s*(.-)%s*$', '%1')
                                 table.insert(pinyins, char_pinyin)
                                 has_valid_pinyin = true
                             end
                         end
                         if has_valid_pinyin then
-                            cand.comment = '〈 ' .. table.concat(pinyins, ' · ') .. ' 〉'
+                            cand.comment = '〈' .. table.concat(pinyins, '·') .. '〉'
                         end
                         yield(cand)
                     elseif env.is_mixed and show_phrase_pinyin and utf8.len(cand.text) == 1 then
                         -- 混输显声：单字拼音
                         local code_comment = env.code_rvdb:lookup(cand.text)
                         if code_comment ~= "" then
-                            cand.comment = xform(code_comment:gsub('%[(.-),(.-),(.-),(.-)%]', '[%3]'))
+                            local pinyin = xform(code_comment:gsub('%[(.-),(.-),(.-),(.-)%]', '%3')):gsub('^%s*(.-)%s*$', '%1')
+                            cand.comment = '〈' .. pinyin .. '〉'
                         else
                             cand.comment = ""
                         end
                         yield(cand)
                     else
                         -- 纯五笔或混输隐声模式
-                        if not hide_pinyin and utf8.len(cand.text) == 1 then
-                            local code_comment = env.code_rvdb:lookup(cand.text)
-                            if code_comment ~= "" then
-                                table.insert(parts, xform(code_comment:gsub('%[(.-),(.-),(.-),(.-)%]', '[%3]')))
+                        if utf8.len(cand.text) == 1 then
+                            -- 单字注解
+                            local parts = {}
+                            if not hide_pinyin then
+                                local code_comment = env.code_rvdb:lookup(cand.text)
+                                if code_comment ~= "" then
+                                    local pinyin = xform(code_comment:gsub('%[(.-),(.-),(.-),(.-)%]', '%3')):gsub('^%s*(.-)%s*$', '%1')
+                                    table.insert(parts, '〈' .. pinyin .. '〉')
+                                end
                             end
-                        end
-                        if not hide_code and utf8.len(cand.text) == 1 then
-                            local code_comment = env.code_rvdb:lookup(cand.text)
-                            if code_comment ~= "" then
-                                table.insert(parts, xform(code_comment:gsub('%[(.-),(.-),(.-),(.-)%]', '[%2]')))
+                            if not hide_code then
+                                local code_comment = env.code_rvdb:lookup(cand.text)
+                                if code_comment ~= "" then
+                                    local code = xform(code_comment:gsub('%[(.-),(.-),(.-),(.-)%]', '%2')):gsub('^%s*(.-)%s*$', '%1')
+                                    table.insert(parts, '〈' .. code .. '〉')
+                                end
                             end
-                        end
-                        if #parts > 0 then
-                            cand.comment = table.concat(parts, ' · ')
+                            if #parts > 0 then
+                                cand.comment = table.concat(parts, '·')
+                            else
+                                cand.comment = ""
+                            end
                         else
-                            cand.comment = ""
+                            -- 词组注解：调用 get_tricomment 根据开关决定显示拼音或字根
+                            local add_comment = get_tricomment(cand, env)
+                            if add_comment ~= '' then
+                                cand.comment = add_comment
+                            end
                         end
 
                         -- 特殊符号提示

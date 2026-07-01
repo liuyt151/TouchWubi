@@ -38,8 +38,9 @@ local VOICE_GAP_THRESHOLD = 5    -- 时间间隔阈值（秒，默认5秒）
 
 local SEPARATOR_LINE = string.rep("─", 12)
 
+-- 检测是否为移动端（Trime / Hamster / 超越输入法等）
 -- 自动检测是否为移动设备（智能平台检测）
--- 支持的输入法：同文(Trime)、仓(Hamster)、鼠须管(Squirrel)、超越输入法(Beyond)、鸿蒙系统等
+-- 支持的输入法：同文(Trime)、仓(Hamster)、超越输入法(Beyond)、鸿蒙系统等
 local function is_mobile_device()
     -- 获取路径（支持 rime_api 和回退到环境变量）
     local user_data_dir = ""
@@ -63,8 +64,7 @@ local function is_mobile_device()
     -- 1. 已知移动端输入法（distribution_code_name）
     if lower_dist == "trime" or
         lower_dist == "hamster" or
-        lower_dist == "hamster3" or
-        lower_dist == "squirrel" then
+        lower_dist == "hamster3" then
         return true
     end
 
@@ -95,7 +95,6 @@ local function is_mobile_device()
     end
 
     -- 4.2 鸿蒙沙箱存储路径（el数字 是鸿蒙特有，/data/storage/ 是 Android/鸿蒙共有）
-    -- 注意：去掉末尾斜杠，避免路径为 /data/storage/el2（无尾随/）时漏匹配
     if lower_path:find("/data/storage/el%d+") or
         sys_lower_path:find("/data/storage/el%d+") then
         return true
@@ -138,6 +137,10 @@ local function is_mobile_device()
     if home:find("/var/mobile/") then
         return true
     end
+
+    -- 8. HOME 目录回退检测（Android 兜底）
+    if home:find("/storage/emulated/") then return true end
+    if home:find("/data/data/") then return true end
 
     return false
 end

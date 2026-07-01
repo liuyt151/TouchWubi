@@ -1,25 +1,52 @@
--- pair_punct.lua - 配对符号输入功能
--- author: kuroame, boomker, shawx
--- license: MIT
--- 雙符成形
---
--- 【方案配置说明】
--- 本脚本包含处理器和分段器，需在 schema.yaml 中添加以下配置：
---
--- engine:
---   processors:
---     - lua_processor@*pair_punct*processor   # 配对标点处理器
---   segmentors:
---     - lua_segmentor@*pair_punct*segmentor   # 配对标点分段器
---
--- switches:                                    # 添加开关控制
---   - name: pair_symbol
---     reset: 0
---     states: [ "关配", "开配" ]
---
--- 无需识别器配置，脚本通过符号白名单和配对表判断：
---   - pairTable 定义了所有支持配对的符号
---   - is_pure_symbol() 函数检查候选是否为配对符号
+--[[
+    pair_punct.lua - 配对符号自动补全模块
+    作者: kuroame, boomker, shawx
+    授权: MIT
+    日期: 2026-06
+
+    【功能概述】
+    智能标点配对模块，输入左符号自动补全右符号，支持空格/回车一键上屏
+    成对符号。解决传统输入法中需要手动输入右符号的繁琐操作。
+
+    【主要功能】
+    1. 成对符号自动补全：在符号输入场景下，候选栏显示配对符号选项，
+       选择后自动在光标位置插入完整的成对符号。
+
+    2. 单双引号一键成对输出：在输入区为空时，直接按引号键（单引号/双引号）
+       自动输出成对引号，无需进入候选栏选择。
+
+    3. 空格/回车快捷上屏：在符号候选场景下，按空格或回车键直接上屏
+       成对符号，无需手动选择候选序号。
+
+    4. 退格键智能清除：输入配对符号后按退格键，自动清除整个配对符号
+       （包括左右符号），避免残留半个符号。
+
+    5. 防重复触发：同一按键在0.2秒内只处理一次，防止快速连击导致重复输出。
+
+    【支持的配对符号】
+    - 引号："" 、'' 、`` 
+    - 括号：() 、[] 、{} 、<> 、（） 、【】 、〔〕
+    - 书名号：《》 、〈〉 、「」 、『』
+    - 其他：〖〗 、〚〛 、〘〙 、［］ 、｛｝
+
+    【方案配置说明】
+    本脚本包含处理器和分段器，需在 schema.yaml 中添加以下配置：
+
+    engine:
+      processors:
+        - lua_processor@*pair_punct*processor   # 配对标点处理器
+      segmentors:
+        - lua_segmentor@*pair_punct*segmentor   # 配对标点分段器
+
+    switches:                                    # 添加开关控制
+      - name: pair_symbol
+        reset: 0
+        states: [ "关配", "开配" ]
+
+    无需识别器配置，脚本通过符号白名单和配对表判断：
+      - pairTable 定义了所有支持配对的符号
+      - is_pure_symbol() 函数检查候选是否为配对符号
+]]
 
 local M = {}
 local processor = {}
