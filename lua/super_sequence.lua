@@ -68,6 +68,34 @@ local function is_function_mode_active(context)
         seg:has_tag("Ndate")         -- shijian.lua N日期功能
 end
 
+---判断是否处于造词模式（mkst，反引号引导）
+---造词模式下 context.input 包含反引号分隔符（如 `amwu`amwu`），
+---而手动调序数据库的 key 是纯字母编码（如 amwu），需要剥离反引号才能匹配。
+---@param context Context | nil
+---@return boolean
+local function is_mkst_mode(context)
+    if not context or not context.composition or context.composition:empty() then
+        return false
+    end
+    local seg = context.composition:back()
+    if not seg then return false end
+    return seg:has_tag("mkst")
+end
+
+---从 mkst 模式的输入中提取当前正在编辑的单字纯字母编码。
+---mkst 输入格式为 "编码1`编码2`..." 或 "`编码1`编码2" 等，
+---需要根据 caret_pos 定位当前编辑位置，提取光标所在段的纯字母编码。
+---@param input string context.input 的子串（到 caret_pos 为止）
+---@return string 纯小写字母编码
+local function extract_mkst_code(input)
+    if not input or input == "" then return "" end
+    -- 去除所有反引号，得到纯字母串
+    -- mkst 的编码段之间用反引号分隔，当前段的编码即 caret_pos 所在段的字母部分
+    local cleaned = input:gsub("`", "")
+    -- 仅保留小写字母
+    return cleaned:match("^[a-z]*") or cleaned
+end
+
 -- 更可靠的 iOS 检测
 local function is_ios_device()
     return os.getenv("HOME") and os.getenv("HOME"):find("/var/mobile/") ~= nil
@@ -329,6 +357,8 @@ local function save_adjustment(code, adjust_key, to_position, timestamp)
 end
 
 ---从 context 中获取当前排序匹配码
+---造词模式（mkst）下，输入含反引号分隔符，需剥离反引号提取纯字母编码，
+---以便与数据库中存储的纯编码 key（如 "amwu|黄"）匹配。
 ---@param context Context
 ---@return string
 local function extract_adjustment_code(context)
@@ -336,7 +366,14 @@ local function extract_adjustment_code(context)
         return context:get_property("sequence_adjustment_code") or ""
     end
 
-    return context.input:sub(1, context.caret_pos)
+    local raw_input = context.input:sub(1, context.caret_pos)
+
+    -- 造词模式：剥离反引号，提取纯字母编码
+    if is_mkst_mode(context) then
+        return extract_mkst_code(raw_input)
+    end
+
+    return raw_input
 end
 
 -- 💡导入导出文件使用标准位置（方便用户访问）
