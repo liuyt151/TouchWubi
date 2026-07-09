@@ -1,7 +1,0 @@
-name: "标准单键"
-author: "Liuyt151"
-support_platform: hmos
-version: "2.0"
-description: "以默认标准键盘为基础，修改数字键盘、中英键盘，增加常用标点符号及操作，增加横屏分屏模式"
-create_time: "2025-10-25"
-update_time: "2026-05-20"
