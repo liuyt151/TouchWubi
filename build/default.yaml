@@ -1,7 +1,0 @@
-__build_info:
-  rime_version: 1.16.0
-schema_list:
-  - schema: wubi
-  - schema: wubi_pinyin_mix
-  - schema: wubi_14
-  - schema: wubi_pinyin_mix_14
