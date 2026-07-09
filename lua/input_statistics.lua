@@ -3,11 +3,11 @@
 -- 日期：2025-10-25
 -- 
 -- 命令列表：
---   显示统计：    /tj 或 tjxs    - 在候选栏显示日、周、月、年统计报告
---   清空统计：    /qk 或 tjqk    - 清空所有统计数据（保留昨日数据）
---   开始临时统计：/ks 或 tjks    - 开始临时统计会话
---   结束临时统计：/js 或 tjjs    - 结束临时统计并生成报告
---   退出临时统计：/tc 或 tjtc    - 退出临时统计（不生成报告）
+--   显示统计：    /tj     - 在候选栏显示日、周、月、年统计报告
+--   清空统计：    /qk     - 清空所有统计数据（保留昨日数据）
+--   开始临时统计：/ks     - 开始临时统计会话
+--   结束临时统计：/js     - 结束临时统计并生成报告
+--   退出临时统计：/tc     - 退出临时统计（不生成报告）
 --
 -- 特性：
 --   📊 支持日、周、月、年多维度统计
@@ -145,7 +145,11 @@ local function is_mobile_device()
     return false
 end
 
-local MOBILE_MODE = is_mobile_device()
+-- 安全初始化：PC 端 rime_api 可能缺少某些方法，用 pcall 保护
+local MOBILE_MODE = false
+pcall(function()
+    MOBILE_MODE = is_mobile_device()
+end)
 
 -- 【方案配置说明】
 -- 本脚本为翻译器（含 init 初始化），需在 schema.yaml 中添加以下配置：
@@ -243,6 +247,10 @@ local function get_chinese_length(text)
     if not text or text == "" then
         return 0
     end
+    -- 检查 utf8 模块是否可用（LuaJIT 可能没有 utf8.codes）
+    if not utf8 or not utf8.codes then
+        return get_text_length(text)  -- 回退到总字符数统计
+    end
     local count = 0
     for _, code in utf8.codes(text) do
         if is_chinese_char(code) then
@@ -284,8 +292,7 @@ end
 
 -- 判断是否是统计命令
 local function is_summary_command(text)
-    return text == "/tj" or text == "/qk" or text == "/ks" or text == "/js" or text == "/tc" or
-           text == "tjxs" or text == "tjqk" or text == "tjks" or text == "tjjs" or text == "tjtc"
+    return text == "/tj" or text == "/qk" or text == "/ks" or text == "/js" or text == "/tc"
 end
 
 -- 获取方案显示名称（优先中文名）
@@ -503,10 +510,11 @@ local function save_stats(schema_id)
     local path = dir .. "input_stats_" .. schema_id .. ".lua"
     local bak_path = path .. ".bak"
 
-    -- 备份旧文件
+    -- 备份旧文件（Windows 兼容：先删除旧 .bak 再重命名）
     local old = io.open(path, "r")
     if old then
         old:close()
+        os.remove(bak_path)      -- Windows 上 os.rename 不会覆盖已存在的文件
         os.rename(path, bak_path)
     end
 
@@ -780,27 +788,14 @@ local function is_empty_report(str)
            str == "※ 本年没有任何记录"
 end
 
--- 根据平台生成候选
+-- 根据平台生成候选（所有内容都放在 text 中，确保候选词可见）
 local function create_candidate(seg, content)
-    -- 对于有数据的报告或手机模式，直接使用 text
-    if MOBILE_MODE then
-        return Candidate("stat", seg.start, seg._end, content, "")
-    else
-        -- PC 模式：空报告用 comment 不上屏，有数据的报告用 text 可上屏
-        if is_empty_report(content) then
-            return Candidate("stat", seg.start, seg._end, "", content)
-        else
-            return Candidate("stat", seg.start, seg._end, content, "")
-        end
-    end
+    return Candidate("stat", seg.start, seg._end, content, "")
 end
 
 local function create_message_candidate(seg, message)
-    if MOBILE_MODE then
-        return Candidate("stat", seg.start, seg._end, message, "")
-    else
-        return Candidate("stat", seg.start, seg._end, "", message)
-    end
+    -- 提示消息始终放在 text 中，确保所有平台都能显示
+    return Candidate("stat", seg.start, seg._end, message, "")
 end
 
 -- 转换器函数：处理统计命令
@@ -811,7 +806,11 @@ local function translator(input, seg, env)
     -- 语音输入不触发 translator，标志保持 false
     local ctx = env.engine.context
     local composition = ctx.composition
-    local preedit = ctx:get_preedit()
+    -- 安全获取 preedit：小狼毫可能没有 get_preedit 方法
+    local preedit = nil
+    if type(ctx.get_preedit) == "function" then
+        preedit = ctx:get_preedit()
+    end
     hadCandidatesBeforeCommit = (composition and not composition:empty())
         or (preedit and preedit.text and #preedit.text > 0)
 
@@ -842,7 +841,7 @@ local function translator(input, seg, env)
     end
     
     -- 命令处理
-    if input == "/tj" or input == "tjxs" then
+    if input == "/tj" then
         flush_current_segment()
         local daily = format_daily_summary(schema_name)
         local weekly = format_weekly_summary(schema_name)
@@ -852,7 +851,7 @@ local function translator(input, seg, env)
         yield(create_candidate(seg, weekly))
         yield(create_candidate(seg, monthly))
         yield(create_candidate(seg, yearly))
-    elseif input == "/qk" or input == "tjqk" then
+    elseif input == "/qk" then
         local yesterday_data = input_stats.yesterday or {count = 0, length = 0, fastest = 0, ts = 0}
         input_stats = {
             daily = {count = 0, length = 0, fastest = 0, ts = 0, avgGaps = {}, avgCnts = {}},
@@ -867,7 +866,7 @@ local function translator(input, seg, env)
         }
         save_stats(env.engine.schema.schema_id)
         yield(create_message_candidate(seg, "※ 所有统计数据已清空（昨日数据保留）。"))
-    elseif input == "/ks" or input == "tjks" then
+    elseif input == "/ks" then
         env.temp_stats = {
             count = 0,
             length = 0,
@@ -877,29 +876,28 @@ local function translator(input, seg, env)
             is_collecting = true
         }
         yield(create_message_candidate(seg, "📝 临时统计已开始"))
-    elseif input == "/js" or input == "tjjs" then
+    elseif input == "/js" then
         if env.temp_stats and env.temp_stats.is_collecting then
             flush_current_segment()
             env.temp_stats.is_collecting = false
             env.temp_stats.last_slash_time = os.time()
             local report = format_custom_summary(env.temp_stats, schema_name)
-            -- 临时统计报告一定有内容，直接使用可上屏候选
-            if MOBILE_MODE then
-                yield(Candidate("stat", seg.start, seg._end, report, ""))
-            else
-                yield(Candidate("stat", seg.start, seg._end, report, ""))
-            end
+            yield(Candidate("stat", seg.start, seg._end, report, ""))
         else
-            yield(create_message_candidate(seg, "※ 当前没有进行中的临时统计"))
+            yield(Candidate("stat", seg.start, seg._end, "※ 当前没有进行中的临时统计", ""))
         end
-    elseif input == "/tc" or input == "tjtc" then
-        if env.temp_stats and env.temp_stats.is_collecting then
+    elseif input == "/tc" then
+        -- 先确保 env.temp_stats 是有效状态
+        if type(env.temp_stats) ~= "table" then
+            env.temp_stats = nil
+        end
+        local is_collecting = env.temp_stats and env.temp_stats.is_collecting
+        if is_collecting then
             env.temp_stats.is_collecting = false
             env.temp_stats = nil
-            yield(create_message_candidate(seg, "※ 临时统计已退出，数据已清空"))
-        else
-            yield(create_message_candidate(seg, "※ 当前没有进行中的临时统计"))
         end
+        local msg = is_collecting and "※ 临时统计已退出，数据已清空" or "※ 当前没有进行中的临时统计"
+        yield(create_message_candidate(seg, msg))
     end
 end
 

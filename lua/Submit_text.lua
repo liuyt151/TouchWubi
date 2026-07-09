@@ -7,6 +7,7 @@
     优化: 修复翻译器场景下 is_14key_layout 函数调用问题
     优化: 14键造词时支持模糊输入，保存时自动生成标准五笔编码
     优化: 清理冗余代码，统一文件路径，移除移动设备检测
+    修复: 添加反向前缀匹配（输入编码以存储编码开头），解决5码输入无法匹配自造词问题
 
     【主要功能】
     1. 自造词手动模式：输入"词条`编码"后按空格键，自动追加到 user_coined_ext.txt
@@ -519,16 +520,47 @@ end
 -- =================================================================
 
 local function user_coined_translator(input, seg, env)
-    if not input or not input:match("^[a-z]+$") then
-        return
+    -- 检查文件路径
+    if not userphrasepath or userphrasepath == "" then
+        userphrasepath = init_userphrase_path()
+        if userphrasepath == "" then
+            return
+        end
     end
     
-    if not userphrasepath or userphrasepath == "" then
+    -- 获取原始输入（不受 abbrev 规则影响），用于混输方案
+    local raw_input = ""
+    
+    -- 方式1：从 env.engine.context 获取（最可靠，Rime Lua API 标准方式）
+    -- env.engine.context.input 是用户原始输入，不受 algebra/abbrev 规则影响
+    if env and env.engine and env.engine.context then
+        raw_input = env.engine.context.input or ""
+    end
+    
+    -- 方式2：从 seg 获取
+    if raw_input == "" and seg then
+        raw_input = seg.input or ""
+    end
+    
+    -- 方式3：从 seg._context 获取
+    if raw_input == "" then
+        local ctx = seg and seg._context
+        if ctx and ctx.input then
+            raw_input = ctx.input or ""
+        end
+    end
+    
+    -- 优先使用原始输入，避免 abbrev 规则导致的编码截断
+    -- 如果 raw_input 不为空且是纯字母，则使用它
+    local query_input = raw_input:match("^[a-z]+$") or input
+    
+    -- 如果 query_input 为空或不是纯字母，直接返回
+    if not query_input or not query_input:match("^[a-z]+$") then
         return
     end
     
     -- 限制：输入少于2个字母时不显示自造词，优先一级简码
-    if #input < 2 then
+    if #query_input < 2 then
         return
     end
     
@@ -541,15 +573,15 @@ local function user_coined_translator(input, seg, env)
     local use_dual_key = is_14key_layout(env)
     
     -- 在循环外先标准化输入编码，避免重复计算
-    local norm_input = use_dual_key and normalize_14key(input) or input
+    local norm_input = use_dual_key and normalize_14key(query_input) or query_input
     
     local seen = {}
-    local function yield_user_coined(text, quality)
+    local function yield_user_coined(text, code, quality)
         if seen[text] then
             return
         end
         seen[text] = true
-        local cand = Candidate("user_coined", seg.start, seg._end, text, "")
+        local cand = Candidate("user_coined", seg.start, seg._end, text, code)
         cand.quality = quality
         yield(cand)
     end
@@ -558,29 +590,39 @@ local function user_coined_translator(input, seg, env)
         if not line:match("^#") and line ~= "" then
             local text, code = line:match("^([^\t]+)\t([a-z]+)")
             if text and code then
-                local code_prefix = code:sub(1, #input)
-                local exact_match = (code == input)
-                local prefix_match = (#input >= 2 and code:find("^" .. input) == 1)
+                local code_prefix = code:sub(1, #query_input)
+                local exact_match = (code == query_input)
+                local prefix_match = (#query_input >= 2 and code:find("^" .. query_input) == 1)
+                -- 反向前缀匹配：输入编码以存储编码开头（如输入 kqwys 匹配存储 kqwy）
+                -- 用于处理5码输入时匹配4码存储的自造词
+                local reverse_prefix_match = (#query_input > #code and query_input:find("^" .. code) == 1)
                 
                 -- 仅在14键布局时启用双键模糊匹配
                 local dual_exact_match = false
                 local dual_prefix_match = false
+                local dual_reverse_prefix_match = false
                 if use_dual_key then
                     local norm_stored = normalize_14key(code)
                     local norm_stored_prefix = normalize_14key(code_prefix)
                     
-                    dual_exact_match = (not exact_match and #input == #code and norm_input == norm_stored)
-                    dual_prefix_match = (not exact_match and not prefix_match and #input >= 2 and #code >= #input and norm_input == norm_stored_prefix)
+                    dual_exact_match = (not exact_match and #query_input == #code and norm_input == norm_stored)
+                    dual_prefix_match = (not exact_match and not prefix_match and #query_input >= 2 and #code >= #query_input and norm_input == norm_stored_prefix)
+                    -- 14键反向前缀模糊匹配
+                    dual_reverse_prefix_match = (not exact_match and not prefix_match and not reverse_prefix_match and #query_input > #code and norm_input:find("^" .. norm_stored) == 1)
                 end
 
                 if exact_match then
-                    yield_user_coined(text, 650)   -- 精确匹配：略高于主词典(500)和用户词典(510)
+                    yield_user_coined(text, code, 950)   -- 精确匹配：高于所有候选（拼音候选最高约800）
                 elseif dual_exact_match then
-                    yield_user_coined(text, 580)   -- 14键模糊精确匹配：低于精确匹配
+                    yield_user_coined(text, code, 900)   -- 14键模糊精确匹配：低于精确匹配
+                elseif reverse_prefix_match then
+                    yield_user_coined(text, code, 850)   -- 反向前缀匹配：用于5码输入匹配4码存储的自造词
+                elseif dual_reverse_prefix_match then
+                    yield_user_coined(text, code, 800)   -- 14键反向前缀模糊匹配
                 elseif prefix_match then
-                    yield_user_coined(text, 550)   -- 前缀匹配：低于精确匹配
+                    yield_user_coined(text, code, 850)   -- 前缀匹配：低于精确匹配
                 elseif dual_prefix_match then
-                    yield_user_coined(text, 480)   -- 14键模糊前缀匹配：最低优先级
+                    yield_user_coined(text, code, 750)   -- 14键模糊前缀匹配：最低优先级
                 end
             end
         end

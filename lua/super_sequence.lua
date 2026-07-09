@@ -493,6 +493,12 @@ function P.func(key_event, env)
 
     -- 移动端数字键调序（PC端数字正常上屏）
     if MOBILE_MODE and context:has_menu() then
+        local input_text = context.input:sub(1, context.caret_pos)
+        -- 计算器模式（=开头）不拦截数字键
+        if input_text:find("^=") then
+            return RIME_PROCESS_RESULTS.kNoop
+        end
+
         local keycode = key_event.keycode
 
         -- 数字键 1：撤销上次调序（移动端下滑数字）
@@ -579,6 +585,15 @@ function F.func(input, env)
     if env.engine.context.input == "/txql" then
         clear_database()
         yield(Candidate("clear_db", 0, #context.input, "※ 手动调序数据库已清空", ""))
+        return
+    end
+    
+    -- 命令模式（/开头）和 z 键反查模式：直接输出所有候选，跳过排序和去重处理
+    local input_text = context.input:sub(1, context.caret_pos)
+    if input_text:find("^/") or input_text:find("^z") then
+        for cand in input:iter() do
+            yield(cand)
+        end
         return
     end
 
@@ -806,6 +821,15 @@ end
 local MAX_CANDIDATES = 200
 
 local function sorter(input, env)
+    local input_text = env.engine.context.input:sub(1, env.engine.context.caret_pos)
+    -- 命令模式（/开头）和 z 键反查模式：直接输出所有候选，跳过排序和数量限制
+    if input_text:find("^/") or input_text:find("^z") then
+        for cand in input:iter() do
+            yield(cand)
+        end
+        return
+    end
+    
     local input_len = #(env.engine.context.input or "")
     -- 1码时仅限制候选数量，不排序（简码候选无需排序，用户会继续输入第二码）
     local limit = (input_len <= 1) and 50 or MAX_CANDIDATES

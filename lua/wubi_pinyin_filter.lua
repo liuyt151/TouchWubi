@@ -10,7 +10,7 @@
     4. 智能区分点击与右滑（需配合 Submit_text.lua 提供 raw_input）：
        - 点击（左字母）：启用双键模糊匹配（如点击 Q 键可匹配 q 或 w 开头的候选）
        - 右滑（右字母）：只精确匹配该字母本身（如右滑 W 键只匹配 w 开头的候选）
-       此特性完美适配14键布局的滑动手势输入。
+    此特性完美适配14键布局的滑动手势输入。
 
     【配置选项】（均为可选）
     wubi_pinyin_filter:
@@ -88,7 +88,7 @@ local function init(env)
     -- 判断是否启用双键匹配（显式配置优先）
     local use_pairs = config:get_bool('wubi_pinyin_filter/use_key_pairs')
     if use_pairs == nil then
-        use_pairs = has_derive_rules(config)  -- 有 derive 规则则自动启用
+        use_pairs = has_derive_rules(config)
     end
     env.use_key_pairs = use_pairs
 
@@ -101,10 +101,43 @@ end
 -- 工具函数
 -- ===================================================================
 local function get_candidate_wubi_code(cand)
+    local comment = cand.comment or ""
     local preedit = cand.preedit or ""
+
+    -- 优先从 comment 中提取编码（new_spelling 会修改 comment 格式）
+    -- 策略1：提取最后一个 〈...〉 中的纯字母内容（通常是编码）
+    if comment ~= "" then
+        local extracted = comment:match("〈([^〉]+)〉$")
+        if extracted then
+            extracted = extracted:gsub("[%s%p]", ""):lower()
+            if extracted ~= "" and extracted:match("^[a-z]+$") and #extracted >= 2 then
+                return extracted
+            end
+        end
+        -- 策略2：尝试提取所有括号中的纯字母
+        for code in comment:gmatch("〈([^〉]+)〉") do
+            local clean_code = code:gsub("[%s%p]", ""):lower()
+            if clean_code ~= "" and clean_code:match("^[a-z]+$") and #clean_code >= 2 then
+                return clean_code
+            end
+        end
+        -- 策略3：从整个 comment 中提取最长的连续纯字母序列
+        local longest_code = ""
+        for code in comment:gmatch("[a-z]+") do
+            if #code > #longest_code and #code >= 2 then
+                longest_code = code
+            end
+        end
+        if longest_code ~= "" then
+            return longest_code
+        end
+    end
+
+    -- 回退到 preedit
     preedit = preedit:gsub("[%s%p]", ""):lower()
     if preedit ~= "" then return preedit end
-    local comment = cand.comment or ""
+
+    -- 最后尝试从 comment 中提取（去掉标点后）
     if comment ~= "" then
         local extracted = comment:match("〈([^〉]+)〉")
         if extracted then return extracted:lower() end
@@ -121,13 +154,10 @@ local function build_letter_sets_mixed(raw_input, max_len, left_to_right, right_
     for i = 1, max_len do
         local ch = raw_input:sub(i, i)
         if right_set[ch] then
-            -- 右字母：精确匹配
             sets[i] = {ch}
         elseif left_to_right[ch] then
-            -- 左字母：模糊匹配（包含自身及对应右字母）
             sets[i] = {ch, left_to_right[ch]}
         else
-            -- 独立字母（如 l, z）：精确匹配
             sets[i] = {ch}
         end
     end
@@ -175,10 +205,8 @@ local function matches_prefix(cand, input_str, n, use_pairs, left_to_right, righ
 
     local letter_sets
     if raw_input and #raw_input >= n then
-        -- 使用混合模式（基于 raw_input）
         letter_sets = build_letter_sets_mixed(raw_input, n, left_to_right, right_set)
     else
-        -- 传统模式
         letter_sets = build_letter_sets_legacy(input_str, n, use_pairs, left_to_right)
     end
     return matches_letter_sets(wubi_code, letter_sets)
@@ -214,19 +242,15 @@ local function build_pinyin_filter_set(letter, left_to_right, right_set, raw_let
     end
 
     if raw_letter then
-        -- 混合模式：根据 raw_letter 决定
         if right_set[raw_letter] then
-            -- 右字母：仅精确
             add_if_valid(raw_letter)
         elseif left_to_right[raw_letter] then
-            -- 左字母：添加左右
             add_if_valid(raw_letter)
             add_if_valid(left_to_right[raw_letter])
         else
             add_if_valid(raw_letter)
         end
     else
-        -- 传统模式
         if use_pairs and left_to_right[letter] then
             add_if_valid(letter)
             add_if_valid(left_to_right[letter])
@@ -271,20 +295,36 @@ end
 local function filter(input, env)
     local context = env.engine.context
     local input_str = context.input or ""
+
+    
+
+    if input_str:find("^/") or input_str:find("^z") then
+        for cand in input:iter() do
+            yield(cand)
+        end
+        return
+    end
+
     local sanitized_input = input_str:gsub("[`' ]", "")
     local input_len = #sanitized_input
     local is_z_pinyin = is_z_pinyin_input(input_str)
 
-    -- 获取 raw_input（由处理器维护）
     local raw_input = context:get_property("raw_input") or ""
-    -- 仅当 raw_input 长度与 input_len 一致时才使用混合模式
-    local use_mixed = (#raw_input == input_len and raw_input ~= "")
+    local pure_code = sanitized_input:gsub("[^a-z]", "")
+    local pure_code_len = #pure_code
 
-    -- 处理含特殊字符的输入（造词）
+    local use_mixed = (#raw_input == pure_code_len and raw_input ~= "")
+
     if input_str:find("[`']") or sanitized_input:find("[^%a]") then
+        if pure_code_len == 0 then
+            for cand in input:iter() do
+                yield(cand)
+            end
+            return
+        end
         for cand in input:iter() do
             if not is_z_pinyin then
-                if matches_prefix(cand, sanitized_input, input_len, env.use_key_pairs, env.left_to_right, env.right_set, use_mixed and raw_input or nil) then
+                if matches_prefix(cand, pure_code, pure_code_len, env.use_key_pairs, env.left_to_right, env.right_set, use_mixed and raw_input or nil) then
                     yield(cand)
                 end
             else
@@ -294,7 +334,6 @@ local function filter(input, env)
         return
     end
 
-    -- z键反查放行
     if is_z_pinyin then
         for cand in input:iter() do
             yield(cand)
@@ -302,7 +341,6 @@ local function filter(input, env)
         return
     end
 
-    -- 没有拼音反向数据库时，仅进行编码匹配
     if not env.spll_rvdb then
         for cand in input:iter() do
             if matches_prefix(cand, sanitized_input, input_len, env.use_key_pairs, env.left_to_right, env.right_set, use_mixed and raw_input or nil) then
@@ -312,9 +350,8 @@ local function filter(input, env)
         return
     end
 
-    -- 第五码拼音首字母筛选（仅当输入长度为5时）
-    if input_len == 5 then
-        local pinyin_filter = sanitized_input:sub(5,5):lower()
+    if pure_code_len == 5 then
+        local pinyin_filter = pure_code:sub(5,5):lower()
         local raw_letter = use_mixed and raw_input:sub(5,5) or nil
         local pinyin_filters = build_pinyin_filter_set(pinyin_filter, env.left_to_right, env.right_set, raw_letter, env.use_key_pairs)
         local matched = {}
@@ -323,8 +360,8 @@ local function filter(input, env)
 
         for cand in input:iter() do
             table.insert(original, cand)
-            -- 检查前4码是否匹配
-            if not matches_prefix(cand, sanitized_input, 4, env.use_key_pairs, env.left_to_right, env.right_set, use_mixed and raw_input or nil) then
+            local prefix_ok = matches_prefix(cand, pure_code, 4, env.use_key_pairs, env.left_to_right, env.right_set, use_mixed and raw_input:sub(1,4) or nil)
+            if not prefix_ok then
                 goto continue
             end
             local target_char = get_target_char(cand, env.use_last_char)
@@ -337,8 +374,8 @@ local function filter(input, env)
                         local orig_start = tonumber(cand.start) or cand.start
                         local orig_end = tonumber(cand._end) or cand._end
                         local out = cand
-                        if orig_start ~= 0 or orig_end ~= input_len then
-                            out = clone_candidate(cand, 0, input_len, cand.preedit)
+                        if orig_start ~= 0 or orig_end ~= pure_code_len then
+                            out = clone_candidate(cand, 0, pure_code_len, cand.preedit)
                         end
                         table.insert(matched, out)
                     end
@@ -352,7 +389,7 @@ local function filter(input, env)
             for _, cand in ipairs(matched) do yield(cand) end
         else
             for _, cand in ipairs(original) do
-                if matches_prefix(cand, sanitized_input, 4, env.use_key_pairs, env.left_to_right, env.right_set, use_mixed and raw_input or nil) then
+                if matches_prefix(cand, pure_code, 4, env.use_key_pairs, env.left_to_right, env.right_set, use_mixed and raw_input:sub(1,4) or nil) then
                     yield(cand)
                 end
             end
@@ -360,7 +397,6 @@ local function filter(input, env)
         return
     end
 
-    -- 其他长度：按输入长度匹配
     for cand in input:iter() do
         if matches_prefix(cand, sanitized_input, input_len, env.use_key_pairs, env.left_to_right, env.right_set, use_mixed and raw_input or nil) then
             yield(cand)

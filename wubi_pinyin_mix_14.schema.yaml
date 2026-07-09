@@ -120,16 +120,15 @@ engine:
     - punct_segmentor
     - fallback_segmentor
   translators:
+    - lua_translator@*schedule                 # 日程命令（/jc 等）- 放在最前面确保优先级最高
     - punct_translator
     - table_translator
     - lua_translator@user_coined_translator
     - table_translator@fixed
     - table_translator@mkst
-    - script_translator                    # 脚本翻译器为wubi_pinyin_filter实现重码筛选提供支持（第五码拼音首字母筛选）
+    - script_translator                        # 脚本翻译器为wubi_pinyin_filter实现重码筛选提供支持（第五码拼音首字母筛选）
     - reverse_lookup_translator
     - lua_translator@*calculator
-    # Lua翻译器：日程翻译器（处理 /jc、/jq、/gz、/date 等命令）
-    - lua_translator@*schedule                 # 日程命令（/jc 等）
     - lua_translator@*email_suffix_translator  # 显示常用邮箱后缀
     - lua_translator@*input_statistics         # 输入统计（/tj 等）
 # ========================================
@@ -140,15 +139,16 @@ speller/+:
   alphabet: zyxwvutsrqponmlkjihgfedcba`/@=
   # 首字母：定义可作为首字母的字符
   initials: zyxwvutsrqponmlkjihgfedcba`/@=
+  # 最大编码长度（自造词或者混输模式需要较长的编码）
+  max_code_length: 500                     # 长拼音输入码限制，500等同无限制
+  auto_clear: max_length                   # 超过500码自动清空
+  auto_select: false                       # 自动上屏开关
   enable_completion: true                  # 启用编码补全：重码筛选时显示4码前缀匹配的候选
   # 拼写代数规则：定义输入转换规则
   algebra/+:                               # algebra: 音节/编码变换规则列表,使用 /+/ 表示"追加到原列表末尾"
 # ========================================
-# 🌟 通配符规则（用于模糊五笔输入）
+# 🌟 14键映射规则
 # ========================================
-    - "derive/^z$/*/"                      # 单独一个 z → 通配符 *
-    - "derive/^z(.*)$/$1/"                 # z+其他码 → 替换为剩余部分（实现模糊匹配）
-    # 14键映射规则
     - derive/w/q/     # W 键 → 视为 Q 区（金）
     - derive/r/e/     # R 键 → 视为 E 区（月）
     - derive/y/t/     # Y 键 → 视为 T 区（禾）

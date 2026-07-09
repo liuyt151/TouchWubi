@@ -40,6 +40,7 @@ preset_keys:
   send_fenhao: { label: ";", send: ";" }
   send_halfcomma: { label: " ， ", send: "," }
   send_comma: { label: ",", send: "," }
+  send_dot: { icon: "textformat.svg", label: ".", send: "." }
   send_dot2: { label: " 。 ", send: "." }
   send_halfbracketL: { label: "(", send: "(" }
   send_halfbracketR: { label: ")", send: ")" }
@@ -50,6 +51,7 @@ preset_keys:
   send_grave: { label: "`", send: grave }
   send_times: { label: "×", send: "*" }
   send_devided: { label: "÷", send: "/" }
+  send_caret: { label: "^", send: "^" }
   # left: { icon: "arrow_left.svg", label: "⤆", send: Left }
   # right: { icon: "arrow_right.svg", label: "⤇", send: Right }
   # confirm: { send: Return, label: "确认", name: confirm }
@@ -122,12 +124,15 @@ preset_keys:
 
   # 标点符号定义
   commit_fulldot: { label: "  。", commit: "。" }
+  send_fulldot: { label: "。", send: "。" }
   commit_bjgth: { label: "!", commit: "!" }
   commit_halfquestionmark: { label: "?", commit: "?" }
   commit_halfcomma: { label: ",", commit: "," }
   commit_halfquoteL: { label: "“", commit: "“" }
   commit_halfquoteR: { label: "”", commit: "”" }
   commit_backquote: { label: "`", commit: "`" }
+  commit_halfcaret: { label: "^", commit: "^" }
+  text_caret: { label: "^", text: "^" }
   commit_tab: { label: "Tab", commit: "	" }
   commit_fullspace: { label: "⏘", commit: "　" }
   commit_dash: { label: "—", commit: "——" }
@@ -194,8 +199,8 @@ preset_keyboards:
       - { click: a, width: 20, label: A   S, long_click: [commit_A, commit_a, commit_6, commit_s, commit_S], swipe_left: a, swipe_right: s, swipe_down: 6, swipe_up: "=" }
       - { click: d, width: 20, label: D   F, long_click: [commit_D, commit_d, commit_7, commit_f, commit_F], swipe_left: d, swipe_right: f, swipe_down: 7, swipe_up: "@" }
       - { click: g, width: 20, label: G   H, long_click: [commit_G, commit_g, commit_8, commit_h, commit_H], swipe_left: g, swipe_right: h, swipe_down: 8, swipe_up: "#" }
-      - { click: j, width: 20, label: J   K, long_click: [commit_J, commit_j, commit_9, commit_k, commit_K], swipe_left: j, swipe_right: k, swipe_down: 9, swipe_up: "“  ”{left}{left}" }
-      - { click: l, width: 20, label: L, long_click: [commit_l, commit_0, commit_L], swipe_down: 0, swipe_up: "（  ）{left}{left}" }
+      - { click: j, width: 20, label: J   K, long_click: [commit_J, commit_j, commit_9, commit_k, commit_K], swipe_left: j, swipe_right: k, swipe_down: 9, swipe_up: text_fullquotationmark }
+      - { click: l, width: 20, label: L, long_click: [commit_l, commit_0, commit_L], swipe_down: 0, swipe_up: text_fullbracket }
   ### 第3行
       - { click: shift, width: 10, has_menu: text_delimiter, name: shift, preview: false }
       - { click: z, width: 10, label: Z, long_click: [commit_z, "`", commit_Z], swipe_down: "%", swipe_up: "/" }
@@ -208,7 +213,7 @@ preset_keyboards:
       - { click: eisu_toggle_123_number, width: 12, has_menu: text_halfperiod, name: number, preview: false }
       - { click: commit_fullcomma, width: 10, label: ，, long_click: commit_half_comma, swipe_up: "-" }
       - { click: space, width: 28, name: space, swipe_up: select_second, preview: false }
-      - { click: commit_fulldot, width: 10, label: 。, long_click: ".", swipe_up: "+" }
+      - { click: commit_fulldot, width: 10, label: 。, long_click: commit_halfperiod, swipe_up: "+", swipe_down: send_dot }
       - { click: eisu_toggle_ABC_english_schema_easy_en, width: 12, has_menu: text_halfcomma, name: english, preview: false }
       - { click: return, width: 14, name: return, swipe_up: select_third, composing: confirm, long_click: [function_keyboard_clearAll, function_keyboard_clearLeft, function_keyboard_clearRight,  function_keyboard_undo, function_keyboard_redo, next], rect_preview: true, preview: false }
 
@@ -256,8 +261,8 @@ preset_keyboards:
       - { click: g, width: 13, label: G    H, long_click: [commit_G, commit_g, commit_8, commit_h, commit_H], swipe_left: g, swipe_right: h, swipe_down: 8, swipe_up: "#" }
       - { width: 22 }
       - { click: g, width: 13, label: G    H, long_click: [commit_G, commit_g, commit_8, commit_h, commit_H], swipe_left: g, swipe_right: h, swipe_down: 8, swipe_up: "#" }
-      - { click: j, width: 13, label: J    K, long_click: [commit_J, commit_j, commit_9, commit_k, commit_K], swipe_left: j, swipe_right: k, swipe_down: 9, swipe_up: "“  ”{left}{left}" }
-      - { click: l, width: 13, label: L, long_click: [commit_l, commit_0, commit_L], swipe_down: 0, swipe_up: "text_halfguillemet" }
+      - { click: j, width: 13, label: J    K, long_click: [commit_J, commit_j, commit_9, commit_k, commit_K], swipe_left: j, swipe_right: k, swipe_down: 9, swipe_up: text_fullquotationmark }
+      - { click: l, width: 13, label: L, long_click: [commit_l, commit_0, commit_L], swipe_down: 0, swipe_up: text_fullchineseguillemet }
   ### 第3行
       - { click: shift, width: 6.5, has_menu: text_delimiter, name: shift, preview: false }
       - { click: z, width: 6.5, label: Z, long_click: [commit_z, commit_Z], swipe_down: "%", swipe_up: "/" }
@@ -274,7 +279,7 @@ preset_keyboards:
       - { click: space, width: 13, name: space, swipe_up: select_second, preview: false }
       - { width: 22 }
       - { click: space, width: 13, name: space, swipe_up: select_second, preview: false }
-      - { click: commit_fulldot, width: 6, label: 。, long_click: ".", swipe_up: "+" }
+      - { click: commit_fulldot, width: 6, label: 。, long_click: commit_halfperiod, swipe_up: "+", swipe_down: send_dot }
       - { click: eisu_toggle_ABC_english_schema_easy_en_land, width: 8, has_menu: text_halfcomma, name: english, preview: false }
       - { click: return, width: 12, name: return, swipe_up: select_third, composing: confirm, long_click: [function_keyboard_clearAll, function_keyboard_clearLeft, function_keyboard_clearRight,  function_keyboard_undo, function_keyboard_redo, next], rect_preview: true, preview: false }
 
@@ -467,7 +472,7 @@ preset_keyboards:
       - { click: (, width: 12, height: 46 }
       - { click: 0, width: 22, height: 46 }
       - { click: ), width: 12, height: 46 }
-      - { click: send_dot, name: dot, label: ., swipe_up: "^", width: 13, height: 46 }
+      - { click: commit_half_dot, name: dot, label: ., swipe_up: text_caret, width: 13, height: 46 }
       - { click: return, name: return, width: 14, height: 46, composing: confirm, long_click: [function_keyboard_clearAll, function_keyboard_clearLeft, function_keyboard_clearRight,  function_keyboard_undo, function_keyboard_redo, next] }
 
   number_land:

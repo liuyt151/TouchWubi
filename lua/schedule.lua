@@ -61,8 +61,36 @@
     ▸ 冬至 2025-12-21    	< [ 06 ]天
     ▸ 小寒 2026-01-05   	< [ 21 ]天
 ]]--
+--
+-- 【调试日志】
+-- 默认关闭，如需启用：将脚本第67行的 debug_log_enabled 从 false 改为 true
+-- 日志文件输出到：用户数据目录/log/schedule_debug.log
 
 require("lib/lunar")
+
+local debug_log_enabled = false                  -- 调试日志开关（默认关闭）
+
+local function log_debug(msg)
+    if not debug_log_enabled then return end
+    
+    local user_dir = ""
+    if rime_api and rime_api.get_user_data_dir then
+        user_dir = rime_api.get_user_data_dir()
+    elseif env and env.engine and env.engine.context and env.engine.context.get_option then
+        local schema_dir = env.engine.schema.schema_dir
+        if schema_dir then
+            user_dir = schema_dir:match("^(.+[/\\])") or ""
+        end
+    end
+    
+    local log_path = user_dir .. "log/schedule_debug.log"
+    
+    local file = io.open(log_path, "a+")
+    if file then
+        file:write("[" .. os.date("%Y-%m-%d %H:%M:%S") .. "] " .. msg .. "\n")
+        file:close()
+    end
+end
 
 -- === 主函数 +++
 local function schedule(input, seg, env)
@@ -71,52 +99,86 @@ local function schedule(input, seg, env)
 
     -- 基础日期时间快捷命令（来自date_translator.lua）
     if (input == "/rq") then
-        -- 日期快捷命令
-        local current_time = os.time()
-        local candidates = {
-            {os.date('%Y-%m-%d', current_time), "日期"},
-            {os.date('%Y/%m/%d', current_time), "日期"},
-            {os.date('%Y.%m.%d', current_time), "日期"},
-            {os.date('%Y%m%d', current_time), "日期"},
-            {os.date('%Y年%m月%d日', current_time):gsub('年0', '年'):gsub('月0','月'), "日期"}
-        }
-        generate_candidates("date", seg, candidates)
+        log_debug("Processing /rq command")
+        local candidates = {}
+        local ok, err = pcall(function()
+            local current_time = os.time()
+            candidates = {
+                {os.date('%Y-%m-%d', current_time), "日期"},
+                {os.date('%Y/%m/%d', current_time), "日期"},
+                {os.date('%Y.%m.%d', current_time), "日期"},
+                {os.date('%Y%m%d', current_time), "日期"},
+                {os.date('%Y年%m月%d日', current_time):gsub('年0', '年'):gsub('月0','月'), "日期"}
+            }
+            log_debug("/rq command succeeded")
+        end)
+        if not ok then
+            log_debug("/rq command failed: " .. err)
+        else
+            generate_candidates("date", seg, candidates)
+        end
         
     elseif (input == "/sj") then
-        -- 时间快捷命令
-        local current_time = os.time()
-        local candidates = {
-            {os.date('%H:%M', current_time), "时间"},
-            {os.date('%H:%M:%S', current_time), "时间"}
-        }
-        generate_candidates("time", seg, candidates)
+        log_debug("Processing /sj command")
+        local candidates = {}
+        local ok, err = pcall(function()
+            local current_time = os.time()
+            candidates = {
+                {os.date('%H:%M', current_time), "时间"},
+                {os.date('%H:%M:%S', current_time), "时间"}
+            }
+            log_debug("/sj command succeeded")
+        end)
+        if not ok then
+            log_debug("/sj command failed: " .. err)
+        else
+            generate_candidates("time", seg, candidates)
+        end
         
     elseif (input == "/xq") then
-        -- 星期快捷命令
-        local current_time = os.time()
-        local week_tab = {'日', '一', '二', '三', '四', '五', '六'}
-        local text = week_tab[tonumber(os.date('%w', current_time) + 1)]
-        local candidates = {
-            {'星期' .. text, "星期"},
-            {'礼拜' .. text, "星期"},
-            {'周' .. text, "星期"}
-        }
-        generate_candidates("week", seg, candidates)
+        log_debug("Processing /xq command")
+        local candidates = {}
+        local ok, err = pcall(function()
+            local current_time = os.time()
+            local week_tab = {'日', '一', '二', '三', '四', '五', '六'}
+            local text = week_tab[tonumber(os.date('%w', current_time) + 1)]
+            candidates = {
+                {'星期' .. text, "星期"},
+                {'礼拜' .. text, "星期"},
+                {'周' .. text, "星期"}
+            }
+            log_debug("/xq command succeeded")
+        end)
+        if not ok then
+            log_debug("/xq command failed: " .. err)
+        else
+            generate_candidates("week", seg, candidates)
+        end
         
     elseif (input == "/dt") then
-        -- 日期时间快捷命令
-        local current_time = os.time()
-        local candidates = {
-            {os.date('%Y-%m-%dT%H:%M:%S+08:00', current_time), "日期时间"},
-            {os.date('%Y-%m-%d %H:%M:%S', current_time), "日期时间"},
-            {os.date('%Y%m%d%H%M%S', current_time), "日期时间"}
-        }
-        generate_candidates("datetime", seg, candidates)
+        log_debug("Processing /dt command")
+        local candidates = {}
+        local ok, err = pcall(function()
+            local current_time = os.time()
+            candidates = {
+                {os.date('%Y-%m-%dT%H:%M:%S+08:00', current_time), "日期时间"},
+                {os.date('%Y-%m-%d %H:%M:%S', current_time), "日期时间"},
+                {os.date('%Y%m%d%H%M%S', current_time), "日期时间"}
+            }
+            log_debug("/dt command succeeded")
+        end)
+        if not ok then
+            log_debug("/dt command failed: " .. err)
+        else
+            generate_candidates("datetime", seg, candidates)
+        end
         
     elseif (input == "/jq") then
-        -- === 节气查询功能 ===
+        log_debug("Processing /jq command")
         local current_date = os.date("%Y%m%d")
+        log_debug("/jq: calling GetNowTimeJq(" .. current_date .. ")")
         local jqs = GetNowTimeJq(current_date)
+        log_debug("/jq: GetNowTimeJq returned " .. (#jqs or 0) .. " items")
         
         local jq_info = "=== 二十四节气 ===\n"
         jq_info = jq_info .. string.format("当前日期：%s年%s月%s日\n", 
@@ -144,11 +206,14 @@ local function schedule(input, seg, env)
         
         local candidates = {{jq_info, "节气查询"}}
         generate_candidates("jieqi_query", seg, candidates)
+        log_debug("/jq command succeeded")
         
     elseif (input == "/gz") then
-        -- === 干支历查询功能 ===
+        log_debug("Processing /gz command")
         local current_datetime = os.date("%Y%m%d%H")
+        log_debug("/gz: calling lunarJzl(" .. current_datetime .. ")")
         local gz_info = lunarJzl(current_datetime)
+        log_debug("/gz: lunarJzl returned: " .. (gz_info or "nil"))
         
         local gz_detail = "=== 干支历信息 ===\n"
         gz_detail = gz_detail .. string.format("当前日期：%s年%s月%s日 %s时\n", 
@@ -158,15 +223,19 @@ local function schedule(input, seg, env)
         
         -- 获取农历信息作为补充
         local lunar_info = Date2LunarDate(os.date("%Y%m%d"))
+        log_debug("/gz: Date2LunarDate returned: " .. (lunar_info or "nil"))
         gz_detail = gz_detail .. string.format("农历：%s\n", lunar_info)
         
         local candidates = {{gz_detail, "干支查询"}}
         generate_candidates("ganzi_query", seg, candidates)
+        log_debug("/gz command succeeded")
         
     elseif (input == "/date") then
-        -- === 农历日期转换功能 ===
+        log_debug("Processing /date command")
         local current_date = os.date("%Y%m%d")
+        log_debug("/date: calling Date2LunarDate(" .. current_date .. ")")
         local lunar_date = Date2LunarDate(current_date)
+        log_debug("/date: Date2LunarDate returned: " .. (lunar_date or "nil"))
         
         local date_info = "=== 农历日期信息 ===\n"
         date_info = date_info .. string.format("公历：%s年%s月%s日 %s\n", 
@@ -176,11 +245,13 @@ local function schedule(input, seg, env)
         
         -- 添加反向转换示例
         local solar_date = LunarDate2Date(tonumber(os.date("%Y%m%d"):sub(1,6) .. "01"), 0)
+        log_debug("/date: LunarDate2Date returned: " .. (solar_date or "nil"))
         date_info = date_info .. "------------------------\n"
         date_info = date_info .. string.format("农历本月初一对应的公历：%s\n", solar_date)
         
         -- 添加节气信息
         local jqs = GetNowTimeJq(current_date)
+        log_debug("/date: GetNowTimeJq returned " .. (#jqs or 0) .. " items")
         for i = 1, math.min(2, #jqs) do
             local jq_name, jq_date = jqs[i]:match("^(%S+)%s+(%d+%-%d+%-%d+)$")
             if jq_name and jq_date then
@@ -195,8 +266,12 @@ local function schedule(input, seg, env)
         
         local candidates = {{date_info, "农历转换"}}
         generate_candidates("lunar_query", seg, candidates)
+        log_debug("/date command succeeded")
 
     elseif (input == "/jt") then
+        log_debug("Processing /jt command")
+        local summary = ""
+        local ok, err = pcall(function()
 
         -- ---〔 ❶ 问候语 〕---
         local function get_greeting()
@@ -377,25 +452,33 @@ local function schedule(input, seg, env)
 
         -- ---〔 ⓿ 信息串 〕--- 
         -- --- 生成最终信息字符串 ---
-        local summary = 
+        summary = 
             string.format("嗨，%s〔%s〕\n", greeting, os.date('%H点%M分%S秒', now)) .. 
             string.format("%d年%02d月%02d日（第 %d 周）%s\n", year, month, day, week_of_year, week_day_str) ..
             string.format("%d年已过 %d 天(%s)，共 %d 天\n", year, day_of_year - 1, year_progress_text, days_in_year) ..
             string.format("农历：%s %s\n", lunar_info_str, zero_jieqi) ..
-            string.format("%d年剩余 %d 天｜农历新年 %d 天\n", next_year, diff_days_next_year, diff_days_lunar_new_year) ..
-            string.format("▸ %s %s \t< [ %02d ]天\n", holiday_data[1][1], holiday_data[1][2], holiday_data[1][3]) ..
-            string.format("▸ %s %s \t< [ %02d ]天\n", holiday_data[2][1], holiday_data[2][2], holiday_data[2][3]) .. 
-            string.format("▸ %s \t< [ %02d ]天\n", upcoming_jqs[1], jieqi_days[1]) ..
-            string.format("▸ %s \t< [ %02d ]天\n", upcoming_jqs[2], jieqi_days[2]) .. 
-            ''
+            string.format("%d年剩余 %d 天｜农历新年 %d 天\n", next_year, diff_days_next_year, diff_days_lunar_new_year)
+        
+        for i = 1, 2 do
+            if holiday_data[i] then
+                summary = summary .. string.format("▸ %s %s \t< [ %02d ]天\n", holiday_data[i][1], holiday_data[i][2], holiday_data[i][3])
+            end
+        end
+        
+        for i = 1, 2 do
+            if upcoming_jqs[i] and jieqi_days[i] then
+                summary = summary .. string.format("▸ %s \t< [ %02d ]天\n", upcoming_jqs[i], jieqi_days[i])
+            end
+        end
 
-        -- 使用 generate_candidates 函数生成候选项
-        local candidates = { 
-            -- {summary, "日期信息整合"}
-            {summary, ""}
-        }
-
-        generate_candidates("day_summary", seg, candidates)
+        log_debug("/jt command succeeded")
+        end)
+        if not ok then
+            log_debug("/jt command failed: " .. err)
+        else
+            local candidates = {{summary, ""}}
+            generate_candidates("day_summary", seg, candidates)
+        end
     end
 end
 

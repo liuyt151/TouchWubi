@@ -8,8 +8,8 @@ config_version: "0.28"
 ### 样式
 style:
   # ...外观...
-  color_scheme: green_light                       # 日间主题
-  # color_scheme_dark: green_dark                 # 夜间主题
+  color_scheme: win11_light                       # 日间主题
+  color_scheme_dark: win11_dark                   # 夜间主题
   # ...字体...
   font_face: Microsoft YaHei                      # 全局字体
   label_font_face: Microsoft YaHei                # 标签字体
@@ -58,107 +58,37 @@ style:
     round_corner: 8                               # *候选背景色块圆角半径，别名 hilited_corner_radius
 
 preset_color_schemes:
-  green_dark:
-    name: "green / 绿意黑"                         # 主题名称：绿意暗黑
-    author: Liang                                 # 作者：Liang
-    text_color: 0x00B894                          # 默认文字颜色：绿色
-    comment_text_color: 0x8F9A9F                  # 注释文字颜色：灰青色
-    label_color: 0x7B7B7B                         # 标签文字颜色：中灰色
-    back_color: 0x1E1E1E                          # 候选窗背景色：深灰黑
-    border_color: 0x1E1E1E                        # 候选窗边框颜色：深灰黑
-    hilited_text_color: 0xFFFFFF                  # 编码文字颜色：白色
-    hilited_back_color: 0x1E1E1E                  # 编码背景颜色：深灰黑
-    hilited_candidate_text_color: 0xFFFFFF        # 高亮候选文字颜色：白色
-    hilited_candidate_back_color: 0x00B894        # 高亮候选背景颜色：绿色
-    hilited_label_color: 0xFFFFFF                 # 高亮候选的标签颜色：白色
-    hilited_comment_text_color: 0x8F9A9F          # 高亮候选的注释颜色：灰青色
-    candidate_text_color: 0xE0E0E0                # 非高亮候选文字颜色：浅灰色
-    candidate_back_color: 0x1E1E1E                # 非高亮候选背景颜色：深灰黑
-    color_format: rgba                            # 颜色格式：RGBA
-
-  green_light:
-    name: "green / 绿意亮"                         # 主题名称：绿意明亮
-    author: Liang                                 # 作者：Liang
-    text_color: 0x000000                          # 默认文字颜色：黑色
-    comment_text_color: 0x4B585E                  # 注释文字颜色：深灰青色
-    label_color: 0x8E8E8E                         # 标签文字颜色：浅灰色
-    back_color: 0xFFFFFF                          # 候选窗背景色：白色
-    border_color: 0xFFFFFF                        # 候选窗边框颜色：白色
-    hilited_text_color: 0xFFFFFF                  # 编码文字颜色：白色
-    hilited_back_color: 0xFFFFFF                  # 编码背景颜色：白色
-    hilited_candidate_text_color: 0xFFFFFF        # 高亮候选文字颜色：白色
-    hilited_candidate_back_color: 0x009D76        # 高亮候选背景颜色：深绿色
-    hilited_label_color: 0xFFFFFF                 # 高亮候选的标签颜色：白色
-    hilited_comment_text_color: 0x4B585E          # 高亮候选的注释颜色：深灰青色
-    candidate_text_color: 0x454545                # 非高亮候选文字颜色：深灰色
-    candidate_back_color: 0xFFFFFF                # 非高亮候选背景颜色：白色
-    color_format: rgba                            # 颜色格式：RGBA
-
   win11_dark:
-    name: "Win11 / 暗黑"                           # 主题名称：Win11暗色版
-    text_color: 0xf9f9f9                          # 默认文字颜色：浅灰白色
-    comment_text_color: 0xf9f9f9                  # 注释文字颜色：浅灰白色
-    label_color: 0xf9f9f9                         # 标签文字颜色：浅灰白色
-    back_color: 0x2C2C2C                          # 候选窗背景色：深灰色
-    border_color: 0x002C2C2C                      # 候选窗边框颜色：透明深灰
-    shadow_color: 0x20000000                      # 候选窗阴影色：半透明黑色
-    hilited_text_color: 0xf9f9f9                  # 编码文字颜色：浅灰白色
-    hilited_back_color: 0x2C2C2C                  # 编码背景颜色：深灰色
-    hilited_candidate_text_color: 0xf9f9f9        # 高亮候选文字颜色：浅灰白色
-    hilited_candidate_back_color: 0x383838        # 高亮候选背景颜色：更深灰色
-    hilited_label_color: 0xf9f9f9                 # 高亮候选的标签颜色：浅灰白色
-    hilited_mark_color: 0xFFC24C                  # 高亮候选前的标记颜色：金黄色
-    candidate_text_color: 0xf9f9f9                # 非高亮候选文字颜色：浅灰白色
-    candidate_back_color: 0x2C2C2C                # 非高亮候选背景颜色：深灰色   
+    name: "Win11_暗黑"                            # 主题名称：Win11暗色版
+    text_color: 0xfff9f9f9                        # 默认文字颜色：
+    comment_text_color: 0xff636363                # 注释文字颜色：
+    label_color: 0xfff9f9f9                       # 标签文字颜色：
+    back_color: 0x80000000                        # 候选窗背景色：
+    border_color: 0x00000000                      # 候选窗边框颜色：
+    shadow_color: 0x20000000                      # 候选窗阴影色：
+    hilited_text_color: 0xffffffff                # 编码文字颜色：
+    hilited_back_color: 0xff000000                # 编码背景颜色：
+    hilited_candidate_back_color: 0xffffffff      # 高亮候选背景颜色：
+    hilited_candidate_text_color: 0xff000000      # 高亮候选文字颜色：
+    hilited_label_color: 0xff000000               # 高亮候选的标签颜色：
+    hilited_mark_color: 0xffffc24c                # 高亮候选前的标记颜色：
+    candidate_text_color: 0xfff9f9f9              # 非高亮候选文字颜色：
+    candidate_back_color: 0xff000000              # 非高亮候选背景颜色：   
 
   win11_light:
-    name: "Win11 / 明亮"                           # 主题名称：Win11浅色版
-    text_color: 0x191919                          # 默认文字颜色：深灰色
-    comment_text_color: 0x191919                  # 注释文字颜色：深灰色
-    label_color: 0x191919                         # 标签文字颜色：深灰色
-    back_color: 0xf9f9f9                          # 候选窗背景色：浅灰白色
-    border_color: 0x009e5a00                      # 候选窗边框颜色：透明绿色
-    shadow_color: 0x20000000                      # 候选窗阴影色：半透明黑色
-    hilited_text_color: 0x191919                  # 编码文字颜色：深灰色
-    hilited_back_color: 0xf9f9f9                  # 编码背景颜色：浅灰白色
-    hilited_candidate_text_color: 0x191919        # 高亮候选文字颜色：深灰色
-    hilited_candidate_back_color: 0xf0f0f0        # 高亮候选背景颜色：浅灰色
-    hilited_label_color: 0x191919                 # 高亮候选的标签颜色：深灰色
-    hilited_mark_color: 0xc06700                  # 高亮候选前的标记颜色：橙色
-    candidate_text_color: 0x191919                # 非高亮候选文字颜色：深灰色
-    candidate_back_color: 0xf9f9f9                # 非高亮候选背景颜色：浅灰白色
+    name: "Win11_明亮"                            # 主题名称：Win11浅色版
+    text_color: 0xff191919                        # 默认文字颜色：
+    comment_text_color: 0xff323232                # 注释文字颜色：
+    label_color: 0xff191919                       # 标签文字颜色：
+    back_color: 0x82000000                        # 候选窗背景色：
+    border_color: 0x00000000                      # 候选窗边框颜色：
+    shadow_color: 0x20000000                      # 候选窗阴影色：
+    hilited_text_color: 0xff000000                # 编码文字颜色：
+    hilited_back_color: 0xffffffff                # 编码背景颜色：
+    hilited_candidate_back_color: 0xff000000      # 高亮候选背景颜色：
+    hilited_candidate_text_color: 0xffffffff      # 高亮候选文字颜色：
+    hilited_label_color: 0xffffffff               # 高亮候选的标签颜色：
+    hilited_mark_color: 0xff808080                # 高亮候选前的标记颜色：
+    candidate_text_color: 0xff191919              # 非高亮候选文字颜色：
+    candidate_back_color: 0xffffffff              # 非高亮候选背景颜色：
 
-  wechat:
-    name: "Wechat / 微信"                          # 主题名称：微信风格
-    text_color: 0x424242                          # 默认文字颜色：深灰色
-    comment_text_color: 0x999999                  # 注释文字颜色：灰色
-    label_color: 0x999999                         # 标签文字颜色：灰色
-    back_color: 0xFFFFFF                          # 候选窗背景色：白色
-    border_color: 0xFFFFFF                        # 候选窗边框颜色：白色
-    shadow_color: 0x20000000                      # 候选窗阴影色：半透明黑色
-    hilited_text_color: 0xFFFFFF                  # 编码文字颜色：白色
-    hilited_back_color: 0x79af22                  # 编码背景颜色：微信绿
-    hilited_candidate_text_color: 0xFFFFFF        # 高亮候选文字颜色：白色
-    hilited_candidate_back_color: 0x79af22        # 高亮候选背景颜色：微信绿
-    hilited_label_color: 0xFFFFFF                 # 高亮候选的标签颜色：白色
-    hilited_comment_text_color: 0xFFFFFF          # 高亮候选的注释颜色：白色
-    candidate_text_color: 0x3c3c3c                # 非高亮候选文字颜色：中灰色
-    candidate_back_color: 0xFFFFFF                # 非高亮候选背景颜色：白色
-
-  burggia:
-    name: "BurgGia / 酒红栀"
-    text_color: 0xB2D88A                          # 文字颜色：栀色（浅黄绿色，栀子花嫩黄调）
-    comment_text_color: 0xB2D88A                  # 注释文字颜色：栀色（与主文字色统一，风格协调）
-    label_color: 0xF5EEDC                         # 非高亮候选标签色：浅卡其（酒红底色的柔和搭配色）
-    back_color: 0x5C2020                          # 候选窗背景色：酒红色（主题核心底色）
-    border_color: 0xF5EEDC                        # 候选窗边框色：浅卡其（与标签色呼应，过渡自然）
-    shadow_color: 0x50000000                      # 候选窗阴影色：半透明黑色（增强层次感）
-    hilited_text_color: 0xB2D88A                  # 输入框文字色：栀色（与主题主色一致）
-    hilited_back_color: 0x222125                  # 输入框背景色：深酒红（比候选窗底色更沉稳）
-    hilited_candidate_text_color: 0x5C2020        # 高亮候选文字色：酒红色（与背景色呼应）
-    hilited_candidate_back_color: 0xE8D5B7        # 高亮候选背景色：浅米色（突出选中状态）
-    hilited_label_color: 0x5C2020                 # 高亮候选标签色：酒红色（与高亮文字色统一）
-    hilited_comment_text_color: 0x424242          # 高亮候选注释色：深灰色（清晰不刺眼）
-    candidate_text_color: 0xF5EEDC                # 非高亮候选文字色：浅卡其（与标签/边框色统一）
-    candidate_back_color: 0x20000000              # 非高亮候选背景色：半透酒红（与主题底色呼应）
-    color_format: rgba                            # 颜色格式：RGBA（支持透明度）

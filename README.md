@@ -7,9 +7,17 @@
 
 ---
 更新日志：
-20260629：新增 wubi_pinyin_filter.lua 第五码拼音筛选过滤器；super_sequence 新增移动端数字键调序与自动词频排序；input_statistics 新增语音输入过滤与跨平台自动检测；schedule 新增 /rq /sj /xq /dt 快捷命令；Submit_text 新增14键双键模糊匹配与标准编码自动查询。
+20260709：修复26键混输方案自造词无法显示问题（new_spelling误判输入模式导致comment被覆盖）；统一wubi_pinyin_filter编码提取逻辑适配所有候选类型；提高自造词quality值使混输方案自造词排在第一候选；
+20260707：修复计算器模式下的小数点输入，修复数字键盘数学符号的输入，修复14键成对符号的引用
+20260705：拼音反查支持词组
+20260701：Submit_text 新增14键双键模糊匹配与标准编码自动查询。
+20260629：新增 wubi_pinyin_filter.lua 第五码拼音筛选过滤器；
 20260627：实现了手动排序和自动排序和第五码拼音筛选重码词
-20260605：添加分号上屏第二候选功能，完善快捷操作体系；优化14键造词编码生成逻辑，确保模糊输入也能生成正确的标准五笔编码。
+20260606：优化14键造词编码生成逻辑，确保模糊输入也能生成正确的标准五笔编码。
+20260605：super_sequence 新增移动端数字键调序与自动词频排序；
+20260605：input_statistics 新增语音输入过滤与跨平台自动检测；
+20260605：schedule 新增 /rq /sj /xq /dt 快捷命令；
+20260605：添加分号上屏第二候选功能，完善快捷操作体系；
 20260529：实现了手机电脑均使用根目录user_coined_ext.txt存储手动造词，且14键26键相互输出对方自造词。
 20260527：实现了手机电脑均使用根目录wubi.txt自动造词，且14键26键相互输出对方自造词。
 20260527：实现了14键布局可以按词频在候选栏中进行排序。
@@ -583,7 +591,65 @@ TouchWB/
 
 ---
 
-## 九、致谢
+## 九、模块耦合关系
+
+### 9.1 词典依赖
+
+| 脚本 | 依赖词典 | 用途 |
+|------|----------|------|
+| `new_spelling.lua` | `wb_spelling.dict.yaml` | 查询汉字拼音、字根、编码 |
+| `wubi_pinyin_filter.lua` | `wb_spelling.dict.yaml` | 查询汉字拼音首字母用于第五码筛选 |
+| `Submit_text.lua` | `wb_spelling.dict.yaml` | 查询标准五笔编码用于造词 |
+| `table_translator` | `wubi.dict.yaml`, `wubi.extended.dict.yaml` | 五笔词典查询 |
+| `script_translator` | `pinyin.dict.yaml` | 拼音词典查询（混输方案） |
+
+### 9.2 Schema 配置依赖
+
+| 配置项 | 影响脚本 | 说明 |
+|--------|----------|------|
+| `abbrev` 规则 | `Submit_text.lua`, `wubi_pinyin_filter.lua` | 26键混输方案特有的缩写规则，脚本针对此规则做了特殊处理 |
+| `use_key_pairs` | `wubi_pinyin_filter.lua` | 14键双键模糊匹配开关，核心功能开关 |
+| `mixed_input` | `new_spelling.lua` | 混输方案标志，脚本据此切换行为（纯五笔/混输） |
+| `lua_reverse_db` | `new_spelling.lua`, `wubi_pinyin_filter.lua` | 反向数据库配置，必须正确配置 `spelling: wb_spelling`, `code: wb_spelling` |
+| 翻译器顺序 | 所有翻译器 | `user_coined_translator` → `table_translator` → `script_translator`，顺序影响候选优先级 |
+| 过滤器顺序 | 所有过滤器 | `new_spelling` → `super_sequence*S` → `super_sequence*F` → `wubi_pinyin_filter`，顺序影响候选处理流程 |
+
+### 9.3 数据文件路径依赖
+
+| 文件 | 脚本 | 路径 |
+|------|------|------|
+| `user_coined_ext.txt` | `Submit_text.lua` | 用户目录根目录（跨平台共享） |
+| `wubi.txt` | `Submit_text.lua` | 用户目录根目录（自动造词） |
+| `lua/sequence/` | `super_sequence.lua` | LevelDB 数据库存储路径 |
+| `lua/tips/tips_show.txt` | `super_tips.lua` | 超级提示数据文件 |
+
+### 9.4 脚本间功能耦合
+
+| 脚本 | 依赖的脚本 | 耦合内容 |
+|------|------------|----------|
+| `wubi_pinyin_filter.lua` | `new_spelling.lua` | 依赖 `new_spelling` 生成的注释格式（`〈...〉` 括号编码） |
+| `Submit_text.lua` | `new_spelling.lua` | 依赖 `new_spelling` 生成的注释格式提取编码 |
+| `super_sequence.lua` | 所有翻译器 | 依赖候选的 `quality` 值规则进行排序 |
+| `new_spelling.lua` | `wubi_pinyin_filter.lua` | 协同处理候选注释，避免编码被覆盖 |
+
+### 9.5 分享注意事项
+
+本方案的 Lua 脚本与当前方案深度耦合，**单独分享 Lua 脚本无法使用**。如需分享给他人，必须提供完整的方案文件：
+
+**必需文件清单**：
+- `*.schema.yaml` — 所有方案配置文件（wubi、wubi_pinyin_mix、wubi_14、wubi_pinyin_mix_14、pinyin、pinyin_14）
+- `*.dict.yaml` — 所有词典文件（wubi、wubi.extended、wubi_14、pinyin、wb_spelling）
+- `lua/*.lua` — 所有 Lua 脚本
+- `lua/lib/*.lua` — 库文件
+- `lua/tips/*.txt` — 超级提示数据
+- `opencc/*.json` — OpenCC 配置
+- `themes/*` — 主题文件
+- `symbols.yaml` — 符号配置
+- `default.yaml`, `info.yaml`, `key_bindings.yaml` — 基础配置
+
+---
+
+## 十、致谢
 
 本项目由 **Shawx** 基于空山明月方案底包修改制作，**Liuyt151** 在此基础上进行了持续优化、功能增强与模块扩展。
 - **空山明月**：底包方案

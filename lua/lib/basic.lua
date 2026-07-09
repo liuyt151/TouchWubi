@@ -1,4 +1,4 @@
--- basic.lua
+﻿-- basic.lua
 -- 基础工具函数库
 --
 -- 【方案配置说明】
@@ -60,27 +60,5 @@ function basic.utf8sub(str, first, ...)
   if fstoff == nil then fstoff = 1 end
   if lstoff ~= nil then lstoff = lstoff - 1 end
   return string.sub(str, fstoff, lstoff)
-end
-
-local POS_PATTERNS = {
-  "^n%.", "^v%.", "^vi%.", "^vt%.",
-  "^a%.", "^adj%.", "^ad%.", "^adv%.",
-  "^prep%.", "^conj%.", "^int%.", "^pron%.",
-  "^num%.", "^art%.", "^abbr%."
-}
-
-function basic.is_pos_tag(text)
-  for _, pat in ipairs(POS_PATTERNS) do
-    if text:match(pat) then return true end
-  end
-  return false
-end
-
-function basic.count_pos_tags(parts)
-  local count = 0
-  for _, part in ipairs(parts) do
-    if basic.is_pos_tag(part) then count = count + 1 end
-  end
-  return count
 end
 
