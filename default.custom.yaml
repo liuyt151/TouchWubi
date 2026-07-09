@@ -1,0 +1,12 @@
+customization:
+  distribution_code_name: Weasel
+  distribution_version: 0.17.4
+  generator: "Rime::SwitcherSettings"
+  modified_time: "Thu Jan  8 14:38:49 2026"
+  rime_version: 1.13.1
+patch:
+  schema_list:
+    - {schema: wubi}                                     # 方案1：五笔输入法
+    - {schema: wubi_pinyin_mix}                          # 方案2：五笔拼音混合输入法
+    - {schema: wubi_14}                                  # 方案4：拇指五笔输入法
+    - {schema: wubi_pinyin_mix_14}                       # 方案5：拇指五笔拼音混合输入法
