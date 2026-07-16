@@ -1,19 +1,4 @@
 ﻿-- basic.lua
--- 基础工具函数库
---
--- 【方案配置说明】
--- 本脚本为工具库，不直接在方案中配置，被其他 Lua 脚本引用：
---
--- 引用方式：
---   local basic = require('lib/basic')
---
--- 主要功能：
---   - basic.index(table, item)              -- 查找元素在表中的索引
---   - basic.map(table, func)                -- 对表进行映射操作
---   - basic.matchstr(str, pat)              -- 字符串匹配
---   - basic.utf8chars(str)                  -- 将UTF-8字符串转为字符数组
---
--- 无需在 schema.yaml 中配置，无需识别器
 
 local basic = {}
 package.loaded[...] = basic
@@ -62,3 +47,46 @@ function basic.utf8sub(str, first, ...)
   return string.sub(str, fstoff, lstoff)
 end
 
+function basic.is_ios_device()
+  local home = os.getenv("HOME") or ""
+  return home:find("/var/mobile/", 1, true) ~= nil
+end
+
+function basic.get_user_data_dir()
+  if rime_api and rime_api.get_user_data_dir then
+    local dir = rime_api.get_user_data_dir()
+    if dir and dir ~= "" then return dir end
+  end
+  local home = os.getenv("HOME") or ""
+  if home ~= "" then
+    if basic.is_ios_device() then
+      return home .. "/Documents"
+    else
+      return home .. "/.config/fcitx/rime"
+    end
+  end
+  return "."
+end
+
+local log_dir_created = false
+
+function basic.get_log_file_path(filename)
+  local log_dir = basic.get_user_data_dir() .. "/log/"
+  if not log_dir_created then
+    local test_file = log_dir .. ".test"
+    local f = io.open(test_file, "w")
+    if not f then
+      local sep = package.config:sub(1, 1)
+      if sep == "\\" then
+        os.execute('cmd /c mkdir "' .. log_dir .. '"')
+      else
+        os.execute("mkdir -p " .. log_dir)
+      end
+    else
+      f:close()
+      os.remove(test_file)
+    end
+    log_dir_created = true
+  end
+  return log_dir .. filename
+end

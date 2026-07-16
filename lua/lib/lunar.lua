@@ -1,30 +1,55 @@
--- lunar.lua
--- 农历节气计算库
 -- Modified by ksqsf for Project Moran
--- AMZ 万象新增节日候选,格式化问候语,重写农历倒计时
+-- AMZ 万象新增节日候选,格式化问候语,重写农历倒计时 
 -- Simplified by Jack Liu <https://aituyaa.com>
 ------------------------------------
 ------wirting by 98wubi Group-------
 ------http://98wb.ys168.com/--------
---
--- 【方案配置说明】
--- 本脚本为工具库，不直接在方案中配置，被其他 Lua 脚本引用：
---
--- 引用方式：
---   require("lib/lunar")
---
--- 主要功能：
---   - Date2LunarDate(date)                  -- 公历转农历
---   - LunarDate2Date(date, leap)            -- 农历转公历
---   - GetNowTimeJq(date)                    -- 获取当前时间节气
---   - lunarJzl(datetime)                    -- 获取干支历
---   - GetDaysToNextLunarNewYear(date)       -- 计算到下一个农历新年的天数
---   - days_until(target_time)               -- 计算到目标日期的天数
---   - get_upcoming_holidays()               -- 获取即将到来的节日
---
--- 无需在 schema.yaml 中配置，无需识别器
--- 被 schedule.lua 引用
 
+
+-- === 性能优化：缓存机制 ===
+-- 天文计算非常耗时，使用缓存避免重复计算
+local cache = {
+    jq_cache = setmetatable({}, { __mode = "v" }),
+    lunar_cache = setmetatable({}, { __mode = "v" }),
+    ganzhi_cache = setmetatable({}, { __mode = "v" }),
+    holiday_cache = setmetatable({}, { __mode = "v" }),
+    year_jq_cache = setmetatable({}, { __mode = "v" }),
+    cache_date = "",
+}
+
+local function update_cache_date()
+    local today = os.date("%Y%m%d")
+    if cache.cache_date ~= today then
+        cache.cache_date = today
+        cache.jq_cache = setmetatable({}, { __mode = "v" })
+        cache.lunar_cache = setmetatable({}, { __mode = "v" })
+        cache.holiday_cache = setmetatable({}, { __mode = "v" })
+    end
+end
+
+local function clean_old_cache()
+    local today = os.date("%Y%m%d")
+    local today_num = tonumber(today)
+    
+    for date in pairs(cache.jq_cache) do
+        local d = tonumber(date)
+        if d and d < today_num - 30 then
+            cache.jq_cache[date] = nil
+        end
+    end
+    for date in pairs(cache.lunar_cache) do
+        local d = tonumber(date)
+        if d and d < today_num - 30 then
+            cache.lunar_cache[date] = nil
+        end
+    end
+    for date in pairs(cache.holiday_cache) do
+        local d = tonumber(date)
+        if d and d < today_num - 30 then
+            cache.holiday_cache[date] = nil
+        end
+    end
+end
 
 -- === 农历节气计算部分 ===
 -- +++ 角度变换 +++
@@ -498,7 +523,7 @@ local jqB = {
 function GetNextJQ(y) 
     local i, obj, q, s1, s2
     y = tostring(y)
-    local jd = 365.2422 * (tonumber(y.sub(y, 1, 4)) - 2000)
+    local jd = 365.2422 * (tonumber(string.sub(y, 1, 4)) - 2000)
 
     obj = {}
 
@@ -508,10 +533,11 @@ function GetNextJQ(y)
         s1 = JDate:toStr() -- 将儒略日转成世界时
         JDate:setFromJD(q, 0)
         s2 = JDate:toStr() -- 将儒略日转成日期格式(输出日期形式的力学时)
-        jqData = s1.sub(s1.gsub(s1, "^( )", ""), 1, 10)
-        jqData = jqData.gsub(jqData, "-", "")
+        local s1_clean = s1:gsub("^( )", "")
+        jqData = string.sub(s1_clean, 1, 10)
+        jqData = jqData:gsub("-", "")
         if (jqData >= y) then
-            table.insert(obj, jqB[i + 1] .. " " .. s1.sub(s1.gsub(s1, "^( )", ""), 1, 10))
+            table.insert(obj, jqB[i + 1] .. " " .. string.sub(s1_clean, 1, 10))
         end
     end
 
@@ -591,6 +617,12 @@ function GetNowTimeJq(date)
  	if string.len(date) < 8 then
  	    return "无效日期"
  	end
+
+    update_cache_date()
+    if cache.jq_cache[date] then
+        return cache.jq_cache[date]
+    end
+
  	JQtable2 = GetNextJQ(date)
  	if tonumber(string.sub(date, 5, 8)) < 322 then
         JQtable1 = GetNextJQ(tonumber(string.sub(date, 1, 4)) - 1 .. string.sub(date, 5, 8))
@@ -616,23 +648,14 @@ function GetNowTimeJq(date)
         end
         -- print(table.concat(JQtable2))
  	end
+
+    cache.jq_cache[date] = JQtable2
+    clean_old_cache()
+
  	return JQtable2
 end
 -- === 农历节气计算部分 END ===
 
--- 常量定义
-local JQ_LIST = {
-    "立春", "雨水", "惊蛰", "春分", "清明", "谷雨", "立夏", "小满", "芒种", "夏至", "小暑", "大暑",
-    "立秋", "处暑", "白露", "秋分", "寒露", "霜降", "立冬", "小雪", "大雪", "冬至", "小寒", "大寒"
-}
-local TIANGAN = {'甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'}
-local DIZHI = {'子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'}
-local JIAZI_YEAR = 1984
-local JIAZI_DAY_TIME = os.time({year=2012, month=8, day=30, hour=23, min=0, sec=0})
-local JIAZI_SHI_TIME = JIAZI_DAY_TIME
-local REFERENCE_MONTH = os.time({year=2010, month=2, day=4, hour=6, min=42, sec=0})
-local DAY_SECONDS = 24 * 3600
-local SHICHEN_SECONDS = 3600 * 2
 
 -- 公历转干支历实现
 --干支历的年以立春发生时刻（注意，不是立春日的0时）为年干支的起点；各月干支以十二节时刻（注意，不一定是各节气日的0时）
@@ -734,14 +757,24 @@ end
 
 -- 返回年的干支序号，1为甲子。。。
 function GanZhiLi:getYearGanZhi()
-    local yeardiff = self.ganZhiYearNum - JIAZI_YEAR
+    local jiaziYear = 1984 -- 甲子年
+    -- print(self.ganZhiYearNum)
+    local yeardiff = self.ganZhiYearNum - jiaziYear
     return self:calRound(1, yeardiff, 60)
 end
 
 -- 返回月的干支号
 function GanZhiLi:getMonGanZhi()
-    local x = REFERENCE_MONTH -- 参考月，立春时间2010-2-4 6:42:00对应的干支序号为15
-    local ydiff = self.ganZhiYearNum - 2010
+    local ck = {
+        year = 2010,
+        month = 2,
+        day = 4,
+        hour = 6,
+        min = 42,
+        sec = 0
+    }
+    local x = os.time(ck) -- 参考月，立春时间2010-2-4 6:42:00对应的干支序号为15
+    local ydiff = self.ganZhiYearNum - ck.year
     local mdiff = self.ganZhiMonNum - 1
     if ydiff >= 0 then
         mdiff = ydiff * 12 + mdiff
@@ -753,18 +786,45 @@ end
 
 -- 返回日的干支号，甲子从1开始
 function GanZhiLi:getDayGanZhi()
-    local daydiff = math.floor((self.ttime - JIAZI_DAY_TIME) / DAY_SECONDS)
+    local DAYSEC = 24 * 3600
+    local jiaziDayTime = os.time({
+        year = 2012,
+        month = 8,
+        day = 30,
+        hour = 23,
+        min = 0,
+        sec = 0
+    })
+    local daydiff = math.floor((self.ttime - jiaziDayTime) / DAYSEC)
     return self:calRound(1, daydiff, 60)
 end
 
 -- 返回时辰的干支号
 function GanZhiLi:getHourGanZhi()
-    local shiDiff = math.floor((self.ttime - JIAZI_SHI_TIME) / SHICHEN_SECONDS)
+    local SHICHENSEC = 3600 * 2
+    local jiaziShiTime = os.time({
+        year = 2012,
+        month = 8,
+        day = 30,
+        hour = 23,
+        min = 0,
+        sec = 0
+    })
+    local shiDiff = math.floor((self.ttime - jiaziShiTime) / SHICHENSEC)
     return self:calRound(1, shiDiff, 60)
 end
 
 -- ====================以下是测试代码=============
--- 节气表、天干、地支已经在上方定义为常量 JQ_LIST, TIANGAN, DIZHI
+-- 节气表
+local jqB = { 
+    "立春", "雨水", "惊蛰", "春分", "清明", "谷雨", "立夏", "小满", "芒种", "夏至", "小暑", "大暑",
+    "立秋", "处暑", "白露", "秋分", "寒露", "霜降", "立冬", "小雪", "大雪", "冬至", "小寒", "大寒"
+}
+-- 天干
+local tiangan = {'甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'}
+
+-- 地支
+local dizhi = {'子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'}
 
 -- 根据六十甲子序号，返回六十甲子字符串,甲子从1开始
 function get60JiaZiStr(i)
@@ -776,18 +836,24 @@ function get60JiaZiStr(i)
     if zhi == 0 then
         zhi = 12
     end
-    return TIANGAN[gan] .. DIZHI[zhi]
+    return tiangan[gan] .. dizhi[zhi]
 end
 
 function lunarJzl(y)
     local x, yidx, midx, didx, hidx
     y = tostring(y)
+
+    update_cache_date()
+    if cache.ganzhi_cache[y] then
+        return cache.ganzhi_cache[y]
+    end
+
     x = GanZhiLi:new()
     x:setTime(os.time({
-        year = tonumber(y.sub(y, 1, 4)),
-        month = tonumber(y.sub(y, 5, -5)),
-        day = tonumber(y.sub(y, 7, -3)),
-        hour = tonumber(y.sub(y, 9, -1)),
+        year = tonumber(string.sub(y, 1, 4)),
+        month = tonumber(string.sub(y, 5, 6)),
+        day = tonumber(string.sub(y, 7, 8)),
+        hour = tonumber(string.sub(y, 9, 10)) or 0,
         min = 4,
         sec = 5
     }))
@@ -796,6 +862,9 @@ function lunarJzl(y)
     didx = x:getDayGanZhi()
     hidx = x:getHourGanZhi()
     GzData = get60JiaZiStr(yidx) .. '年' .. get60JiaZiStr(midx) .. '月' .. get60JiaZiStr(didx) .. '日' .. get60JiaZiStr(hidx) .. '时'
+
+    cache.ganzhi_cache[y] = GzData
+    clean_old_cache()
 
     return GzData
 end
@@ -940,6 +1009,13 @@ end
 -- 公历日期 Gregorian:格式 YYYYMMDD
 -- <返回值>农历日期 中文 天干地支属相
 function Date2LunarDate(Gregorian)
+    Gregorian = tostring(Gregorian)
+
+    update_cache_date()
+    if cache.lunar_cache[Gregorian] then
+        return cache.lunar_cache[Gregorian]
+    end
+
     -- 天干名称
     local cTianGan = {"甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"}
     -- 地支名称
@@ -977,9 +1053,9 @@ function Date2LunarDate(Gregorian)
     local wNongliData = {"AB500D2", "4BD0883", "4AE00DB", "A5700D0", "54D0581", "D2600D8", "D9500CC", "655147D", "56A00D5", "9AD00CA", "55D027A", "4AE00D2", "A5B0682", "A4D00DA", "D2500CE", "D25157E", "B5500D6", "56A00CC", "ADA027B", "95B00D3", "49717C9", "49B00DC", "A4B00D0", "B4B0580", "6A500D8", "6D400CD", "AB5147C", "2B600D5", "95700CA", "52F027B", "49700D2", "6560682", "D4A00D9", "EA500CE", "6A9157E", "5AD00D6", "2B600CC", "86E137C", "92E00D3", "C8D1783", "C9500DB", "D4A00D0", "D8A167F", "B5500D7", "56A00CD", "A5B147D", "25D00D5", "92D00CA", "D2B027A", "A9500D2", "B550781", "6CA00D9", "B5500CE", "535157F", "4DA00D6", "A5B00CB", "457037C", "52B00D4", "A9A0883", "E9500DA", "6AA00D0", "AEA0680", "AB500D7", "4B600CD", "AAE047D", "A5700D5", "52600CA", "F260379", "D9500D1", "5B50782", "56A00D9", "96D00CE", "4DD057F", "4AD00D7", "A4D00CB", "D4D047B", "D2500D3", "D550883", "B5400DA", "B6A00CF", "95A1680", "95B00D8", "49B00CD", "A97047D", "A4B00D5", "B270ACA", "6A500DC", "6D400D1", "AF40681", "AB600D9", "93700CE", "4AF057F", "49700D7", "64B00CC", "74A037B", "EA500D2", "6B50883", "5AC00DB", "AB600CF", "96D0580", "92E00D8", "C9600CD", "D95047C", "D4A00D4", "DA500C9", "755027A", "56A00D1", "ABB0781", "25D00DA", "92D00CF", "CAB057E", "A9500D6", "B4A00CB", "BAA047B", "AD500D2", "55D0983", "4BA00DB", "A5B00D0", "5171680", "52B00D8", "A9300CD", "795047D", "6AA00D4", "AD500C9", "5B5027A", "4B600D2", "A6E0681", "A4E00D9", "D2600CE", "EA6057E", "D5300D5", "5AA00CB", "76A037B", "96D00D3", "4AF0B83", "4AD00DB", "A4D00D0", "D0B1680", "D2500D7", "D5200CC", "DD4057C", "B5A00D4", "56D00C9", "55B027A", "49B00D2", "A570782", "A4B00D9", "AA500CE", "B25157E", "6D200D6", "ADA00CA", "4B6137B", "93700D3", "49F08C9", "49700DB", "64B00D0", "68A1680", "EA500D7", "6AA00CC", "A6C147C", "AAE00D4", "92E00CA", "D2E0379", "C9600D1", "D550781", "D4A00D9", "DA400CD", "5D5057E", "56A00D6", "A6C00CB", "55D047B", "52D00D3", "A9B0883", "A9500DB", "B4A00CF", "B6A067F", "AD500D7", "55A00CD", "ABA047C", "A5A00D4", "52B00CA", "B27037A", "69300D1", "7330781", "6AA00D9", "AD500CE", "4B5157E", "4B600D6", "A5700CB", "54E047C", "D1600D2", "E960882", "D5200DA", "DAA00CF", "6AA167F", "56D00D7", "4AE00CD", "A9D047D", "A2D00D4", "D1500C9", "F250279", "D5200D1"}
     Gregorian = tostring(Gregorian)
     local Year, Month, Day, Pos, Data0, Data1, MonthInfo, LeapInfo, Leap, Newyear, Data2, Data3, LYear, thisMonthInfo
-    Year = tonumber(Gregorian.sub(Gregorian, 1, 4))
-    Month = tonumber(Gregorian.sub(Gregorian, 5, 6))
-    Day = tonumber(Gregorian.sub(Gregorian, 7, 8))
+    Year = tonumber(string.sub(Gregorian, 1, 4))
+    Month = tonumber(string.sub(Gregorian, 5, 6))
+    Day = tonumber(string.sub(Gregorian, 7, 8))
     if (Year > 2100 or Year < 1899 or Month > 12 or Month < 1 or Day < 1 or Day > 31 or string.len(Gregorian) < 8) then
         return "无效日期"
     end
@@ -1070,6 +1146,9 @@ function Date2LunarDate(Gregorian)
     -- 构建新的返回格式：乙巳年十月廿五 · 蛇年 · 深冬象限
     LunarYear = tiangan .. dizhi .. "年" .. LunarMonth .. cDayName[LDay] .. " · " .. shuxiang .. "年 · " .. cSeasonQuadrant[seasonIndex]
     
+    cache.lunar_cache[Gregorian] = LunarYear
+    clean_old_cache()
+    
     -- print(LunarYear)
     return LunarYear
 end
@@ -1079,9 +1158,9 @@ end
 function GettotalDay(Date, dayCount)
     local Year, Month, Day, days, total, t
     Date = tostring(Date)
-    Year = tonumber(Date.sub(Date, 1, 4))
-    Month = tonumber(Date.sub(Date, 5, 6))
-    Day = tonumber(Date.sub(Date, 7, 8))
+    Year = tonumber(string.sub(Date, 1, 4))
+    Month = tonumber(string.sub(Date, 5, 6))
+    Day = tonumber(string.sub(Date, 7, 8))
 
     -- 根据是否是闰年设置天数表
     if IsLeap(Year) > 365 then
@@ -1132,9 +1211,9 @@ function LunarDate2Date(Gregorian, IsLeap)
     LunarData = {"AB500D2", "4BD0883", "4AE00DB", "A5700D0", "54D0581", "D2600D8", "D9500CC", "655147D", "56A00D5", "9AD00CA", "55D027A", "4AE00D2", "A5B0682", "A4D00DA", "D2500CE", "D25157E", "B5500D6", "56A00CC", "ADA027B", "95B00D3", "49717C9", "49B00DC", "A4B00D0", "B4B0580", "6A500D8", "6D400CD", "AB5147C", "2B600D5", "95700CA", "52F027B", "49700D2", "6560682", "D4A00D9", "EA500CE", "6A9157E", "5AD00D6", "2B600CC", "86E137C", "92E00D3", "C8D1783", "C9500DB", "D4A00D0", "D8A167F", "B5500D7", "56A00CD", "A5B147D", "25D00D5", "92D00CA", "D2B027A", "A9500D2", "B550781", "6CA00D9", "B5500CE", "535157F", "4DA00D6", "A5B00CB", "457037C", "52B00D4", "A9A0883", "E9500DA", "6AA00D0", "AEA0680", "AB500D7", "4B600CD", "AAE047D", "A5700D5", "52600CA", "F260379", "D9500D1", "5B50782", "56A00D9", "96D00CE", "4DD057F", "4AD00D7", "A4D00CB", "D4D047B", "D2500D3", "D550883", "B5400DA", "B6A00CF", "95A1680", "95B00D8", "49B00CD", "A97047D", "A4B00D5", "B270ACA", "6A500DC", "6D400D1", "AF40681", "AB600D9", "93700CE", "4AF057F", "49700D7", "64B00CC", "74A037B", "EA500D2", "6B50883", "5AC00DB", "AB600CF", "96D0580", "92E00D8", "C9600CD", "D95047C", "D4A00D4", "DA500C9", "755027A", "56A00D1", "ABB0781", "25D00DA", "92D00CF", "CAB057E", "A9500D6", "B4A00CB", "BAA047B", "AD500D2", "55D0983", "4BA00DB", "A5B00D0", "5171680", "52B00D8", "A9300CD", "795047D", "6AA00D4", "AD500C9", "5B5027A", "4B600D2", "A6E0681", "A4E00D9", "D2600CE", "EA6057E", "D5300D5", "5AA00CB", "76A037B", "96D00D3", "4AF0B83", "4AD00DB", "A4D00D0", "D0B1680", "D2500D7", "D5200CC", "DD4057C", "B5A00D4", "56D00C9", "55B027A", "49B00D2", "A570782", "A4B00D9", "AA500CE", "B25157E", "6D200D6", "ADA00CA", "4B6137B", "93700D3", "49F08C9", "49700DB", "64B00D0", "68A1680", "EA500D7", "6AA00CC", "A6C147C", "AAE00D4", "92E00CA", "D2E0379", "C9600D1", "D550781", "D4A00D9", "DA400CD", "5D5057E", "56A00D6", "A6C00CB", "55D047B", "52D00D3", "A9B0883", "A9500DB", "B4A00CF", "B6A067F", "AD500D7", "55A00CD", "ABA047C", "A5A00D4", "52B00CA", "B27037A", "69300D1", "7330781", "6AA00D9", "AD500CE", "4B5157E", "4B600D6", "A5700CB", "54E047C", "D1600D2", "E960882", "D5200DA", "DAA00CF", "6AA167F", "56D00D7", "4AE00CD", "A9D047D", "A2D00D4", "D1500C9", "F250279", "D5200D1"}
     Gregorian = tostring(Gregorian)
     local Year, Month, Day, Pos, Data, MonthInfo, LeapInfo, Leap, Newyear, Sum, thisMonthInfo, GDate
-    Year = tonumber(Gregorian.sub(Gregorian, 1, 4))
-    Month = tonumber(Gregorian.sub(Gregorian, 5, 6))
-    Day = tonumber(Gregorian.sub(Gregorian, 7, 8))
+    Year = tonumber(string.sub(Gregorian, 1, 4))
+    Month = tonumber(string.sub(Gregorian, 5, 6))
+    Day = tonumber(string.sub(Gregorian, 7, 8))
     if (Year > 2100 or Year < 1900 or Month > 12 or Month < 1 or Day > 30 or Day < 1 or string.len(Gregorian) < 8) then
         return "无效日期"
     end
@@ -1489,7 +1568,7 @@ end
 function generate_candidates(input, seg, candidates)
     for _, item in ipairs(candidates) do
         local candidate = Candidate(input, seg.start, seg._end, item[1], item[2])
-        candidate.quality = 482829 -- 设定高优先级
+        candidate.quality = 1000000 -- 设定高优先级
         yield(candidate)
     end
 end

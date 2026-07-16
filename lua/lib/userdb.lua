@@ -1,24 +1,3 @@
--- userdb.lua
--- LevelDB 数据库封装工具库
---
--- 【方案配置说明】
--- 本脚本为工具库，不直接在方案中配置，被其他 Lua 脚本引用：
---
--- 引用方式：
---   local userdb = require('lib/userdb')
---   local db = userdb.LevelDb("database_name")
---
--- 主要功能：
---   - LevelDb()                             -- 创建/获取数据库实例
---   - db:fetch(key)                         -- 获取键值
---   - db:update(key, value)                 -- 更新键值
---   - db:erase(key)                         -- 删除键值
---   - db:query(prefix)                      -- 前缀查询
---   - db:meta_fetch(key)                    -- 获取元数据
---   - db:meta_update(key, value)            -- 更新元数据
---
--- 无需在 schema.yaml 中配置，无需识别器
-
 local META_KEY_PREFIX = "\001" .. "/"
 
 -- UserDb 缓存，使用弱引用表，不阻止垃圾回收并能自动清理
