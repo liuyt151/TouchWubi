@@ -116,7 +116,27 @@ end
 -- =================================================================
 
 -- 单字编码缓存，避免重复读取字典
-local char_code_cache = {}
+-- 使用弱引用表，当没有外部引用时自动清理
+local char_code_cache = setmetatable({}, { __mode = "v" })
+
+-- 缓存大小限制（防止无限增长）
+local MAX_CACHE_SIZE = 2000
+
+-- 清理过期缓存
+local function clean_code_cache()
+    local count = 0
+    for k in pairs(char_code_cache) do
+        count = count + 1
+    end
+    if count > MAX_CACHE_SIZE then
+        local i = 0
+        for k in pairs(char_code_cache) do
+            char_code_cache[k] = nil
+            i = i + 1
+            if i >= count - MAX_CACHE_SIZE then break end
+        end
+    end
+end
 
 -- 从字典文件中查询单个汉字的标准五笔编码
 local function get_char_wubi_code(char)
@@ -224,6 +244,8 @@ local function get_char_wubi_code(char)
     
     -- 缓存结果（包括空结果，避免重复查询）
     char_code_cache[char] = code
+    -- 定期清理缓存，防止无限增长
+    clean_code_cache()
     return code
 end
 
@@ -429,17 +451,24 @@ local function commit_text_processor(key, env)
     local candidate_count = 0
 
     -- 记录候选词（用于反查等功能）
-    if input_text and input_text:find("^%p*(%a+%d*)$") then
-        if context:has_menu() then
-            candidate_count = segment.menu:candidate_count()
-        end
-        env.last_1th_text = context:get_commit_text() or ""
-        env.last_2th_text = {text="", type=""}
-        env.last_3th_text = {text="", type=""}
-        if candidate_count > 1 then
-            env.last_2th_text = segment:get_candidate_at(1)
-            if candidate_count > 2 then
-                env.last_3th_text = segment:get_candidate_at(2)
+    if input_text then
+        log.info("Submit_text", "input_text=" .. input_text .. " matches_pattern=" .. tostring(input_text:find("^%p*(%a+%d*)$")) .. " has_menu=" .. tostring(context:has_menu()))
+        if input_text:find("^%p*(%a+%d*)$") then
+            if context:has_menu() then
+                candidate_count = segment.menu:candidate_count()
+            end
+            env.last_1th_text = context:get_commit_text() or ""
+            env.last_2th_text = {text="", type=""}
+            env.last_3th_text = {text="", type=""}
+            if candidate_count > 1 then
+                local cand2 = segment:get_candidate_at(1)
+                env.last_2th_text = cand2 and {text=cand2.text or "", type=cand2.type or ""} or {text="", type=""}
+                log.info("Submit_text", "candidate_count=" .. candidate_count .. " 2nd_candidate=" .. (env.last_2th_text.text or "nil"))
+                if candidate_count > 2 then
+                    local cand3 = segment:get_candidate_at(2)
+                    env.last_3th_text = cand3 and {text=cand3.text or "", type=cand3.type or ""} or {text="", type=""}
+                    log.info("Submit_text", "3rd_candidate=" .. (env.last_3th_text.text or "nil") .. " type=" .. (env.last_3th_text.type or "nil"))
+                end
             end
         end
     end
@@ -496,20 +525,28 @@ local function commit_text_processor(key, env)
         return 1
     end
 
-    -- 反查功能（单引号键）
-    if key.keycode == 0x27 and context:is_composing() and env.last_3th_text and env.last_3th_text.text ~= "" then
-        if env.last_3th_text.type == "reverse_lookup" or env.last_3th_text.type == "table" then
-            context:clear()
-            engine:commit_text(env.last_3th_text.text)
+    -- 单引号键上屏第三候选（有候选菜单时）
+    if key.keycode == 0x27 then
+        log.info("Submit_text", "apostrophe key pressed, has_menu=" .. tostring(context:has_menu()) .. " is_composing=" .. tostring(context:is_composing()) .. " last_3th_text=" .. (env.last_3th_text and env.last_3th_text.text or "nil"))
+        if context:has_menu() then
+            if env.last_3th_text and env.last_3th_text.text ~= "" then
+                log.info("Submit_text", "committing 3rd candidate: " .. env.last_3th_text.text)
+                context:clear()
+                engine:commit_text(env.last_3th_text.text)
+            end
             return 1
         end
     end
 
     -- 分号上屏第二候选
-    if key.keycode == 0x3B and context:is_composing() and env.last_2th_text and env.last_2th_text.text ~= "" then
-        context:clear()
-        engine:commit_text(env.last_2th_text.text)
-        return 1
+    if key.keycode == 0x3B then
+        log.info("Submit_text", "semicolon key pressed, has_menu=" .. tostring(context:has_menu()) .. " is_composing=" .. tostring(context:is_composing()) .. " last_2th_text=" .. (env.last_2th_text and env.last_2th_text.text or "nil"))
+        if context:is_composing() and env.last_2th_text and env.last_2th_text.text ~= "" then
+            log.info("Submit_text", "committing 2nd candidate: " .. env.last_2th_text.text)
+            context:clear()
+            engine:commit_text(env.last_2th_text.text)
+            return 1
+        end
     end
     
     return 2

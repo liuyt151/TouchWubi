@@ -28,14 +28,15 @@ local utf8chars = basic.utf8chars
 -- ===================================================================
 -- 动态构建键对映射（从 derive 规则解析）
 -- ===================================================================
-local left_to_right = {}
-local right_to_left = {}
-local left_set = {}
-local right_set = {}
 
 local function build_key_mapping(config)
+    local left_to_right = {}
+    local right_to_left = {}
+    local left_set = {}
+    local right_set = {}
+    
     local algebra = config:get_list('speller/algebra')
-    if not algebra then return end
+    if not algebra then return left_to_right, right_to_left, left_set, right_set end
     for i = 0, algebra.size - 1 do
         local item = algebra:get_value_at(i)
         if item and item.value then
@@ -48,6 +49,7 @@ local function build_key_mapping(config)
             end
         end
     end
+    return left_to_right, right_to_left, left_set, right_set
 end
 
 -- ===================================================================
@@ -78,12 +80,8 @@ local function init(env)
         env.spll_rvdb = ReverseDb('build/' .. spll_rvdb_name .. '.reverse.bin')
     end
 
-    -- 构建键对映射（无论是否启用，先构建）
-    build_key_mapping(config)
-    env.left_to_right = left_to_right
-    env.right_to_left = right_to_left
-    env.left_set = left_set
-    env.right_set = right_set
+    -- 构建键对映射（每个方案独立，避免方案切换时映射混乱）
+    env.left_to_right, env.right_to_left, env.left_set, env.right_set = build_key_mapping(config)
 
     -- 判断是否启用双键匹配（显式配置优先）
     local use_pairs = config:get_bool('wubi_pinyin_filter/use_key_pairs')
@@ -200,6 +198,7 @@ end
 
 local function matches_prefix(cand, input_str, n, use_pairs, left_to_right, right_set, raw_input)
     if n == 0 then return true end
+    
     local wubi_code = get_candidate_wubi_code(cand)
     if wubi_code == "" then return true end
 
@@ -209,11 +208,48 @@ local function matches_prefix(cand, input_str, n, use_pairs, left_to_right, righ
     else
         letter_sets = build_letter_sets_legacy(input_str, n, use_pairs, left_to_right)
     end
-    return matches_letter_sets(wubi_code, letter_sets)
+    
+    if matches_letter_sets(wubi_code, letter_sets) then
+        return true
+    end
+    
+    local preedit = cand.preedit or ""
+    preedit = preedit:gsub("[%s%p]", ""):lower()
+    if preedit ~= "" then
+        return matches_letter_sets(preedit, letter_sets)
+    end
+    
+    return false
+end
+
+-- 拼音首字母缓存，避免重复查询反向数据库
+local pinyin_initial_cache = setmetatable({}, { __mode = "v" })
+local MAX_PINYIN_CACHE_SIZE = 3000
+
+-- 清理过期拼音缓存
+local function clean_pinyin_cache()
+    local count = 0
+    for k in pairs(pinyin_initial_cache) do
+        count = count + 1
+    end
+    if count > MAX_PINYIN_CACHE_SIZE then
+        local i = 0
+        for k in pairs(pinyin_initial_cache) do
+            pinyin_initial_cache[k] = nil
+            i = i + 1
+            if i >= count - MAX_PINYIN_CACHE_SIZE then break end
+        end
+    end
 end
 
 local function get_pinyin_initial(char, spll_rvdb)
     if not char or char == '' then return nil end
+    
+    -- 优先从缓存中获取
+    if pinyin_initial_cache[char] then
+        return pinyin_initial_cache[char]
+    end
+    
     local spll_raw = spll_rvdb:lookup(char)
     if not spll_raw or spll_raw == '' then return nil end
     local clean_raw = spll_raw:gsub("※", "")
@@ -227,6 +263,11 @@ local function get_pinyin_initial(char, spll_rvdb)
     elseif pinyin:sub(1,2) == 'ch' then initial = 'c'
     elseif pinyin:sub(1,2) == 'sh' then initial = 's'
     end
+    
+    -- 缓存结果
+    pinyin_initial_cache[char] = initial
+    clean_pinyin_cache()
+    
     return initial
 end
 

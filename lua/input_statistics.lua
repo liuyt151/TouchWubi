@@ -174,8 +174,8 @@ local input_stats = input_stats or {
     yesterday = {count = 0, length = 0, fastest = 0, ts = 0}
 }
 
--- 连续输入段追踪（全局，跨方案共享）
-avgSpdInfo = avgSpdInfo or {
+-- 连续输入段追踪（局部变量，每个方案独立）
+local avgSpdInfo = {
     logSts = 0,           -- 0=空闲/段结束，1=记录中
     startTime = 0,        -- 当前段起始时间
     clickTime = 0,        -- 最后一次按键时间
@@ -186,7 +186,47 @@ avgSpdInfo = avgSpdInfo or {
 
 -- 候选栏状态标志（在 translator 按键阶段记录，commit_notifier 中读取）
 -- true = 上屏前有候选栏（按键输入），false = 上屏前无候选栏（语音输入）
-hadCandidatesBeforeCommit = hadCandidatesBeforeCommit or false
+local hadCandidatesBeforeCommit = false
+
+-- 性能优化：文件保存防抖机制
+-- 避免每次输入都写入文件，减少IO开销
+local save_debounce = {
+    last_save_time = 0,
+    min_interval = 30,  -- 最小保存间隔（秒）
+    pending_save = false,
+    last_schema_id = ""
+}
+
+-- 前向声明，避免闭包时 save_stats 为 nil
+local save_stats
+
+-- 防抖保存函数
+local function debounced_save_stats(schema_id)
+    if not schema_id then return false end
+    
+    local now = os.time()
+    local time_since_last_save = now - save_debounce.last_save_time
+    
+    -- 如果距离上次保存不到最小间隔，标记为待保存
+    if time_since_last_save < save_debounce.min_interval then
+        save_debounce.pending_save = true
+        save_debounce.last_schema_id = schema_id
+        return false
+    end
+    
+    -- 执行实际保存
+    save_debounce.last_save_time = now
+    save_debounce.pending_save = false
+    return save_stats(schema_id)
+end
+
+-- 强制保存待处理的数据（在退出时调用）
+local function flush_pending_save()
+    if save_debounce.pending_save and save_debounce.last_schema_id then
+        save_stats(save_debounce.last_schema_id)
+        save_debounce.pending_save = false
+    end
+end
 
 -- 安全的字符长度计算函数
 local function get_text_length(text)
@@ -504,7 +544,7 @@ local function serialize_table(tbl, indent)
 end
 
 -- 保存统计到文件（按方案分开存储，自动备份）
-local function save_stats(schema_id)
+save_stats = function(schema_id)
     if not schema_id then return false end
     local dir = (rime_api and rime_api.get_user_data_dir and rime_api:get_user_data_dir() or "") .. "/lua/"
     local path = dir .. "input_stats_" .. schema_id .. ".lua"
@@ -1026,8 +1066,8 @@ local function init(env)
                 end
             end
             
-            -- 保存统计
-            save_stats(schema_id)
+            -- 保存统计（使用防抖机制）
+            debounced_save_stats(schema_id)
         end)
     end
 end

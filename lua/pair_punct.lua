@@ -3,49 +3,6 @@
     作者: kuroame, boomker, shawx
     授权: MIT
     日期: 2026-06
-
-    【功能概述】
-    智能标点配对模块，输入左符号自动补全右符号，支持空格/回车一键上屏
-    成对符号。解决传统输入法中需要手动输入右符号的繁琐操作。
-
-    【主要功能】
-    1. 成对符号自动补全：在符号输入场景下，候选栏显示配对符号选项，
-       选择后自动在光标位置插入完整的成对符号。
-
-    2. 单双引号一键成对输出：在输入区为空时，直接按引号键（单引号/双引号）
-       自动输出成对引号，无需进入候选栏选择。
-
-    3. 空格/回车快捷上屏：在符号候选场景下，按空格或回车键直接上屏
-       成对符号，无需手动选择候选序号。
-
-    4. 退格键智能清除：输入配对符号后按退格键，自动清除整个配对符号
-       （包括左右符号），避免残留半个符号。
-
-    5. 防重复触发：同一按键在0.2秒内只处理一次，防止快速连击导致重复输出。
-
-    【支持的配对符号】
-    - 引号："" 、'' 、`` 
-    - 括号：() 、[] 、{} 、<> 、（） 、【】 、〔〕
-    - 书名号：《》 、〈〉 、「」 、『』
-    - 其他：〖〗 、〚〛 、〘〙 、［］ 、｛｝
-
-    【方案配置说明】
-    本脚本包含处理器和分段器，需在 schema.yaml 中添加以下配置：
-
-    engine:
-      processors:
-        - lua_processor@*pair_punct*processor   # 配对标点处理器
-      segmentors:
-        - lua_segmentor@*pair_punct*segmentor   # 配对标点分段器
-
-    switches:                                    # 添加开关控制
-      - name: pair_symbol
-        reset: 0
-        states: [ "关配", "开配" ]
-
-    无需识别器配置，脚本通过符号白名单和配对表判断：
-      - pairTable 定义了所有支持配对的符号
-      - is_pure_symbol() 函数检查候选是否为配对符号
 ]]
 
 local M = {}
@@ -82,7 +39,6 @@ end
 
 local tag_prefix = "pair_punct_"
 
--- 确保单双引号映射精准（成对配置无误）
 local pairTable = {
     ["`"] = { "`" },
     ["```"] = { "```" },
@@ -110,15 +66,77 @@ local pairTable = {
     ["》"] = { "《", "》" },
     ["〈"] = { "〈", "〉" },
     ["〉"] = { "〈", "〉" },
-	["quotedbl"] = { "“", "”" },  -- 双引号成对配置
-    ["apostrophe"] = { "‘", "’" }, -- 单引号成对配置
+	["quotedbl"] = { "“", "”" },
+    ["apostrophe"] = { "‘", "’" },
 }
 
--- 纯符号候选白名单
 local symbol_whitelist = {
     "`", "```", "“", "”", "‘", "’", "(", ")", "[", "]", "{", "}", "<", ">",
     "（", "）", "【", "】", "〔", "〕", "〚", "〛", "〘", "〙", "「", "」",
     "［", "］", "｛", "｝", "『", "』", "〖", "〗", "《", "》", "〈", "〉"
+}
+
+local direct_punct_map = {
+    [","] = "，",
+    ["."] = "。",
+    ["!"] = "！",
+    ["?"] = "？",
+    [":"] = "：",
+    ['"'] = "”",
+    ["("] = "（",
+    [")"] = "）",
+    ["-"] = "-",
+    ["#"] = "#",
+    ["$"] = "￥",
+    ["%"] = "%",
+    ["&"] = "&",
+    ["*"] = "*",
+    ["~"] = "~",
+    ["|"] = "·",
+}
+
+local pool_punct_first_map = {
+    ["/"] = "、",
+    ["\\"] = "、",
+    ["="] = "=",
+    ["["] = "「",
+    ["]"] = "」",
+    ["{"] = "『",
+    ["}"] = "』",
+    ["<"] = "《",
+    [">"] = "》",
+    ["*"] = "*",
+    ["#"] = "#",
+    ["$"] = "￥",
+    ["%"] = "%",
+    ["&"] = "&",
+    ["~"] = "~",
+    ["|"] = "·",
+    ["!"] = "！",
+    ["("] = "（",
+    [")"] = "）",
+}
+
+local pool_punct_set = {
+    ["/"] = true,
+    ["\\"] = true,
+    ["="] = true,
+    ["["] = true,
+    ["]"] = true,
+    ["{"] = true,
+    ["}"] = true,
+    ["<"] = true,
+    [">"] = true,
+    ["*"] = true,
+    ["#"] = true,
+    ["$"] = true,
+    ["%"] = true,
+    ["&"] = true,
+    ["~"] = true,
+    ["|"] = true,
+    ["!"] = true,
+    ["("] = true,
+    [")"] = true,
 }
 
 local function is_pure_symbol(txt)
@@ -179,34 +197,80 @@ function segmentor.init(env)
 end
 
 function processor.init(env)
-    env.dist_code = rime_api:get_distribution_code_name()
-    -- 精确的防重复状态
     env.last_processed_key = nil
     env.last_processed_time = 0
 end
 
 function processor.func(key, env)
-    local key_value = key:repr()
-    local schema = env.engine.schema
     local context = env.engine.context
-    local page_size = schema.page_size
     local composition = context.composition
     local current_time = os.clock()
     
-    -- 防重复：同一按键在短时间内只处理一次
-    if (key.keycode == 34 or key.keycode == 39) and 
-       env.last_processed_key == key.keycode and 
+    local base_key_value = key:repr():gsub("^Shift%+", ""):gsub("^Release%+", "")
+    
+    if key:release() then
+        return 2
+    end
+    
+    local input = context.input or ""
+    if string.sub(input, 1, 1) == "=" then
+        return 2
+    end
+    
+    if (base_key_value == "quotedbl" or base_key_value == "apostrophe") and 
+       env.last_processed_key == base_key_value and 
        (current_time - env.last_processed_time < 0.2) then
         return 2
     end
 
-    -- 非配对符号开启状态，直接放行
-    if not context:get_option("pair_symbol") then
-        return 2
+    local is_ascii_mode = context:get_option("ascii_mode")
+    local is_ascii_punct = context:get_option("ascii_punct")
+    
+    local key_char = base_key_value
+    if key_char == "comma" then key_char = "," end
+    if key_char == "period" then key_char = "." end
+    if key_char == "question" then key_char = "?" end
+    if key_char == "exclam" then key_char = "!" end
+    if key_char == "semicolon" then key_char = ";" end
+    if key_char == "colon" then key_char = ":" end
+    if key_char == "slash" then key_char = "/" end
+    if key_char == "backslash" then key_char = "\\" end
+    if key_char == "caret" then key_char = "^" end
+    if key_char == "tilde" then key_char = "~" end
+    if key_char == "asterisk" then key_char = "*" end
+    if key_char == "at" then key_char = "@" end
+    if key_char == "numbersign" then key_char = "#" end
+    if key_char == "dollar" then key_char = "$" end
+    if key_char == "percent" then key_char = "%" end
+    if key_char == "ampersand" then key_char = "&" end
+    if key_char == "bar" then key_char = "|" end
+    if key_char == "grave" then key_char = "`" end
+    if key_char == "equal" then key_char = "=" end
+    if key_char == "bracketleft" then key_char = "[" end
+    if key_char == "bracketright" then key_char = "]" end
+    if key_char == "braceleft" then key_char = "{" end
+    if key_char == "braceright" then key_char = "}" end
+    if key_char == "less" then key_char = "<" end
+    if key_char == "greater" then key_char = ">" end
+    if key_char == "parenleft" then key_char = "(" end
+    if key_char == "parenright" then key_char = ")" end
+    if key_char == "quotedbl" then key_char = "\"" end
+    if key_char == "apostrophe" then key_char = "'" end
+    if key_char == "minus" then key_char = "-" end
+    
+    local has_candidate_menu = context:has_menu()
+    
+    local top_candidate_text = ""
+    if has_candidate_menu then
+        local selected_cand = context:get_selected_candidate()
+        if selected_cand and selected_cand.text then
+            top_candidate_text = selected_cand.text
+        end
     end
-
-    -- 处理退格
-    if key_value == "BackSpace" then
+    
+    local is_direct_punct = direct_punct_map[key_char] ~= nil
+    
+    if base_key_value == "BackSpace" then
         local input = context.input or ""
         local is_pair_punct = false
         for _, pair in pairs(pairTable) do
@@ -221,69 +285,87 @@ function processor.func(key, env)
         return 2
     end
 
-    -- 核心修复：单双引号成对输出（简化触发逻辑，确保必执行）
-    -- 处理双引号键（quotedbl）：无论左/右，直接触发成对输出
-    if key.keycode == 34 then 
-        -- 直接提交成对双引号，无需先输入左引号
-        if composition:empty() then
-            env.engine:commit_text(pairTable["quotedbl"][1] .. pairTable["quotedbl"][2])
-            env.last_processed_key = key.keycode  -- 更新按键码
-            env.last_processed_time = current_time  -- 更新处理时间
+    if not context:get_option("pair_symbol") then
+        return 2
+    end
+
+    if has_candidate_menu then
+        if base_key_value == "plus" or base_key_value == "minus" or
+           base_key_value == "bracketleft" or base_key_value == "bracketright" or
+           base_key_value == "Left" or base_key_value == "Right" then
+            return 2
+        end
+        
+        if is_direct_punct and not is_ascii_mode and not is_ascii_punct then
+            local punct_symbol = direct_punct_map[key_char] or ""
+            env.engine:commit_text(top_candidate_text .. punct_symbol)
             context:clear()
             return 1
         end
-    end
-
-    -- 处理单引号键（apostrophe）：无论左/右，直接触发成对输出
-    if key.keycode == 39 then 
-        -- 直接提交成对单引号，无需先输入左引号
-        if composition:empty() then
-            env.engine:commit_text(pairTable["apostrophe"][1] .. pairTable["apostrophe"][2])
-            env.last_processed_key = key.keycode  -- 更新按键码
-            env.last_processed_time = current_time  -- 更新处理时间
-            context:clear()
+        
+        if key_char == ";" then
+            return 2
+        end
+        
+        if base_key_value == "apostrophe" then
             return 1
         end
-    end
-
-    -- 区分文字/符号场景
-    local is_symbol_scene = false
-    local selected_cand = composition:back() and composition:back():get_selected_candidate()
-    if context:has_menu() and selected_cand and is_pure_symbol(selected_cand.text) then
-        is_symbol_scene = true
-    elseif not context:has_menu() and context.input ~= "" and is_pure_symbol(context.input) then
-        is_symbol_scene = true
+        
+        if pool_punct_set[key_char] then
+            local punct_symbol = pool_punct_first_map[key_char] or ""
+            context:clear()
+            env.engine:commit_text(top_candidate_text .. punct_symbol)
+            return 1
+        end
+        
+        return 2
     else
-        return 2
-    end
-
-    -- 符号场景处理空格/回车
-    if (key_value == "space" or key_value == "Return") and is_symbol_scene then
-        local target_txt = selected_cand and selected_cand.text or context.input
-        local pair = pairTable[target_txt]
-        if pair then
-            local commit_content = (#pair == 2) and (pair[1] .. pair[2]) or pair[1]
-            context:clear()
-            env.engine:commit_text(commit_content)
-            return 1
+        if composition:empty() then
+            if base_key_value == "apostrophe" then
+                env.engine:commit_text(pairTable["apostrophe"][1] .. pairTable["apostrophe"][2])
+                env.last_processed_key = base_key_value
+                env.last_processed_time = current_time
+                context:clear()
+                return 1
+            end
+            
+            if base_key_value == "quotedbl" then
+                env.engine:commit_text(pairTable["quotedbl"][1] .. pairTable["quotedbl"][2])
+                env.last_processed_key = base_key_value
+                env.last_processed_time = current_time
+                context:clear()
+                return 1
+            end
+            
+            if is_direct_punct and not is_ascii_mode and not is_ascii_punct then
+                local is_pair_symbol = pairTable[key_char] ~= nil
+                if is_pair_symbol then
+                    return 2
+                else
+                    local punct_symbol = direct_punct_map[key_char] or ""
+                    env.engine:commit_text(punct_symbol)
+                    return 1
+                end
+            end
+            
+            return 2
+        else
+            if is_direct_punct and not is_ascii_mode and not is_ascii_punct then
+                local is_pair_symbol = pairTable[key_char] ~= nil
+                if is_pair_symbol then
+                    context:clear()
+                    return 2
+                else
+                    local punct_symbol = direct_punct_map[key_char] or ""
+                    env.engine:commit_text(punct_symbol)
+                    context:clear()
+                    return 1
+                end
+            end
+            
+            return 2
         end
     end
-
-    -- 处理候选选择
-    if composition:empty() then
-        return 2
-    end
-    
-    local segment = composition:back()
-    local idx = segment.selected_index
-    local selected_cand_index = get_selected_candidate_index(key_value, idx, page_size)
-    
-    if context:has_menu() and (selected_cand_index >= 0) then
-        segment.selected_index = selected_cand_index
-        return 1
-    end
-
-    return 2
 end
 
 function segmentor.func(segmentation, env)
@@ -291,6 +373,15 @@ function segmentor.func(segmentation, env)
     local context = env.engine.context
 
     if not context:get_option("pair_symbol") or segmentation:empty() then
+        return true
+    end
+
+    local input_text = context.input or ""
+    if not is_pure_symbol(input_text) then
+        return true
+    end
+    
+    if #input_text > 0 and #input_text <= 1 and string.byte(input_text) < 128 then
         return true
     end
 

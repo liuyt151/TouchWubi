@@ -182,6 +182,54 @@ local function spell_phrase(s, spll_rvdb)
     end
 end
 
+-- GB2312字符集过滤缓存，避免重复查询反向数据库
+local gb2312_cache = setmetatable({}, { __mode = "v" })
+local MAX_GB2312_CACHE_SIZE = 3000
+
+-- 清理过期GB2312缓存
+local function clean_gb2312_cache()
+    local count = 0
+    for k in pairs(gb2312_cache) do
+        count = count + 1
+    end
+    if count > MAX_GB2312_CACHE_SIZE then
+        local i = 0
+        for k in pairs(gb2312_cache) do
+            gb2312_cache[k] = nil
+            i = i + 1
+            if i >= count - MAX_GB2312_CACHE_SIZE then break end
+        end
+    end
+end
+
+-- 单个字符GB2312检查（带缓存）
+local function check_char_gb2312(char, spll_rvdb)
+    if not char or char == '' then return 1 end
+    
+    -- 优先从缓存中获取
+    if gb2312_cache[char] ~= nil then
+        return gb2312_cache[char]
+    end
+    
+    local spll_raw = spll_rvdb:lookup(char)
+    local result = 1  -- 默认通过
+    
+    if spll_raw ~= '' then
+        local chars = xform(spll_raw:gsub('%[(.-),(.-),(.-),(.-)%]', '[%4]'))
+        if chars:find("GB2312") then
+            result = 1
+        elseif chars:find("GBK") then
+            result = 0
+        end
+    end
+    
+    -- 缓存结果
+    gb2312_cache[char] = result
+    clean_gb2312_cache()
+    
+    return result
+end
+
 -- GB2312字符集过滤
 local function isgb2312(cand, env)
     local ctext = cand.text
@@ -189,21 +237,12 @@ local function isgb2312(cand, env)
         return 1
     end
     if utf8.len(ctext) == 1 then
-        local spll_raw = env.spll_rvdb:lookup(ctext)
-        if spll_raw ~= '' then
-            local chars = xform(spll_raw:gsub('%[(.-),(.-),(.-),(.-)%]', '[%4]'))
-            return chars:find("GB2312") and 1 or 0
-        else
-            return 1
-        end
+        return check_char_gb2312(ctext, env.spll_rvdb)
     elseif utf8.len(ctext) > 1 then
         local arr = utf8chars(ctext)
         for i = 1, #arr do
-            local spll_raw = env.spll_rvdb:lookup(arr[i])
-            if spll_raw ~= '' then
-                local chars = xform(spll_raw:gsub('%[(.-),(.-),(.-),(.-)%]', '[%4]'))
-                if chars:find("GBK") then return 0 end
-            end
+            local result = check_char_gb2312(arr[i], env.spll_rvdb)
+            if result == 0 then return 0 end
         end
         return 1
     end

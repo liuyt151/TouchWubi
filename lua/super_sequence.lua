@@ -12,8 +12,11 @@
 --   数字键 0    前移第10候选
 --   数字键 1    撤销上次调序操作（仅对当前编码有效）
 --
--- 【其他命令】
---   /txql   清除所有调序记录（清空整个数据库）
+-- 【其他命令】（均仅影响当前方案）
+--   /txql   调序清理（清除所有调序记录，仅清空 userdb，保留备份文件）
+--   /txdc   调序导出（导出调序数据至 sequence_<schema_id>.txt，仅当数据库条目数大于备份时允许覆盖）
+--   /txdr   调序导入（从 sequence_<schema_id>.txt 恢复调序数据）
+--   /txtj   调序统计（查看所有调序记录，按空格上屏）
 --
 -- 【方案配置说明】
 -- 本脚本包含处理器(P)和过滤器(F、S)，需在 schema.yaml 中添加相应配置：
@@ -209,36 +212,80 @@ local last_adjustment = nil
 --- 避免 S 排序覆盖手动调序结果
 local mobile_candidate_order = {}
 
--- 添加一个标记，用于跟踪是否需要导出
-local need_export = false
+-- 按方案存储的导出标记
+local _need_export = {}
+-- 当前方案ID（用于 fini 时关闭数据库）
+local current_schema_id = nil
+-- 按方案存储的清空标记（清空后阻止自动导入）
+local _cleared_schemas = {}
 
--- 💡适配iOS的路径
--- local db_file_name = is_ios_device() and
---                      (os.getenv("HOME") .. "/Documents/sequence") or
---                      "lua/sequence"
---👇修改了数据库的数据，存放在lua目录下
-local db_file_name = is_ios_device() and
-                     (os.getenv("HOME") .. "/Documents/sequence") or
-                     "lua/sequence"  -- 数据库存放在lua目录下
+-- 按方案存储的数据库连接
+local _user_dbs = {}
 
-                     local _user_db = nil
+-- 获取方案特定的数据库文件名
+local function get_db_file_name(schema_id)
+    local base_name = is_ios_device() and
+                      (os.getenv("HOME") .. "/Documents/sequence") or
+                      "lua/sequence"
+    return base_name .. "_" .. schema_id
+end
 
--- 获取或创建 LevelDb 实例，避免重复打开
-local function get_user_db()
-    _user_db = _user_db or LevelDb(db_file_name)
+-- 获取方案特定的导出文件名
+local function get_export_file_name(schema_id)
+    return (rime_api.get_user_data_dir() and (rime_api.get_user_data_dir() .. "/lua/sequence_" .. schema_id .. ".txt") or "lua/sequence_" .. schema_id .. ".txt")
+end
 
-    local function close()
-        if _user_db:loaded() then
+local function get_user_db(schema_id)
+    if not schema_id then return nil, function() end end
+    
+    -- 如果数据库连接已存在且正常，直接返回
+    if _user_dbs[schema_id] and _user_dbs[schema_id]:loaded() then
+        local function close()
+            if _user_dbs[schema_id] and _user_dbs[schema_id]:loaded() then
+                collectgarbage()
+                _user_dbs[schema_id]:close()
+            end
+        end
+        return _user_dbs[schema_id], close
+    end
+    
+    -- 尝试重新打开或创建数据库（最多重试3次）
+    local max_retries = 3
+    local db = nil
+    
+    for i = 1, max_retries do
+        -- 如果之前的连接存在但未加载，先关闭
+        if _user_dbs[schema_id] then
+            pcall(function() _user_dbs[schema_id]:close() end)
+            _user_dbs[schema_id] = nil
+        end
+        
+        -- 创建新连接
+        db = LevelDb(get_db_file_name(schema_id))
+        
+        if db then
+            -- 尝试打开
+            local ok, err = pcall(function() db:open() end)
+            if ok and db:loaded() then
+                _user_dbs[schema_id] = db
+                break
+            end
+        end
+        
+        -- 重试前稍作等待
+        if i < max_retries then
             collectgarbage()
-            _user_db:close()
+        end
+    end
+    
+    local function close()
+        if _user_dbs[schema_id] and _user_dbs[schema_id]:loaded() then
+            collectgarbage()
+            _user_dbs[schema_id]:close()
         end
     end
 
-    if _user_db and not _user_db:loaded() then
-        _user_db:open()
-    end
-
-    return _user_db, close
+    return db, close
 end
 
 ---@param value string LevelDB 中序列化的值
@@ -254,11 +301,13 @@ local function parse_adjustment_value(value)
 end
 
 ---@param code string 当前输入码
+---@param schema_id string 方案ID
 ---@return table<string, { to_position: integer, updated_at: integer, from_position?: integer, candidate?: Candidate}> | nil
-local function get_adjustment(code)
+local function get_adjustment(code, schema_id)
     if code == "" or code == nil then return nil end
 
-    local db = get_user_db()
+    local db = get_user_db(schema_id)
+    if not db then return nil end
 
     local accessor = db:query(code .. "|")
     if accessor == nil then return nil end
@@ -276,20 +325,40 @@ local function get_adjustment(code)
     return table
 end
 
+local last_export_date = nil
+
+local function get_today_date()
+    local now = os.date("*t")
+    return string.format("%04d%02d%02d", now.year, now.month, now.day)
+end
+
+local function should_auto_export(schema_id)
+    if not _need_export[schema_id] then return false end
+    local today = get_today_date()
+    if last_export_date ~= today then
+        last_export_date = today
+        return true
+    end
+    return false
+end
+
 ---@param code string 匹配的输入码
 ---@param adjust_key string | number 匹配键，为候选索引（命令模式），或候选词（普通模式）
 ---@param to_position integer | nil 目标位置，`nil` 为从数据库中移除该纪录
 ---@param timestamp? number 操作时间戳，默认去当前时间戳
-local function save_adjustment(code, adjust_key, to_position, timestamp)
+---@param schema_id? string 方案ID
+local function save_adjustment(code, adjust_key, to_position, timestamp, schema_id)
     if code == "" or code == nil then return end
 
-    local db = get_user_db()
+    local db = get_user_db(schema_id)
+    if not db then return end
+    
     local key = string.format("%s|%s", code, adjust_key)
+    local result = false
 
     if to_position == nil or to_position <= 0 then
         if type(adjust_key) == "number" then
-            -- 遍历目标位置，去最后一个再此位置的项重置
-            local user_adjustment = get_adjustment(code)
+            local user_adjustment = get_adjustment(code, schema_id)
 
             if user_adjustment == nil then return false end
 
@@ -306,26 +375,27 @@ local function save_adjustment(code, adjust_key, to_position, timestamp)
             end
 
             if erase_item.key ~= nil then
-                need_export = true
-                return db:erase(string.format("%s|%s", code, erase_item.key))
+                _need_export[schema_id] = true
+                result = db:erase(string.format("%s|%s", code, erase_item.key))
             end
 
-            return false
+            return result
         else
-            need_export = true
-            return db:erase(key)
+            _need_export[schema_id] = true
+            result = db:erase(key)
         end
+    else
+        if not timestamp then
+            timestamp = rime_api.get_time_ms
+                and os.time() + tonumber(string.format("0.%s", rime_api.get_time_ms()))
+                or os.time()
+        end
+        local value = string.format("%s\t%s", to_position, timestamp)
+        _need_export[schema_id] = true
+        result = db:update(key, value)
     end
 
-    -- 由于 lua os.time() 的精度只到秒，排序可能会引起问题
-    if not timestamp then
-        timestamp = rime_api.get_time_ms
-            and os.time() + tonumber(string.format("0.%s", rime_api.get_time_ms()))
-            or os.time()
-    end
-    local value = string.format("%s\t%s", to_position, timestamp)
-    need_export = true
-    return db:update(key, value)
+    return result
 end
 
 ---从 context 中获取当前排序匹配码
@@ -339,67 +409,153 @@ local function extract_adjustment_code(context)
     return context.input:sub(1, context.caret_pos)
 end
 
--- 💡导入导出文件使用标准位置（方便用户访问）
--- local sync_file_name = rime_api.get_user_data_dir() .. "/lua/sequence.txt"
---修改导出文件到用户文件夹
-local sync_file_name = nil  -- 设置为 nil 禁用文本导出功能
-
 local function file_exists(name)
     local f = io.open(name, "r")
     return f ~= nil and io.close(f)
 end
 
-local function export_to_file(db)
-    -- 如果 sync_file_name 为 nil，则跳过导出
-    if not sync_file_name then return end
+--- 统计数据库中有效条目数（排除系统元数据键）
+---@param db LevelDB
+---@return integer
+local function count_db_entries(db)
+    if not db or not db:loaded() then return 0 end
+    local accessor = db:query("")
+    if not accessor then return 0 end
+    local count = 0
+    for key, _ in accessor:iter() do
+        if key:sub(1, 1) ~= "\001" then
+            count = count + 1
+        end
+    end
+    accessor = nil
+    return count
+end
 
-    -- 总是导出，覆盖旧文件
-    local file = io.open(sync_file_name, "w")
-    if not file then return end
+--- 统计备份文件中有效条目数（排除注释行和空行，要求包含 tab 分隔符）
+---@param schema_id string
+---@return integer
+local function count_txt_entries(schema_id)
+    local filename = get_export_file_name(schema_id)
+    if not filename then return 0 end
+    local file = io.open(filename, "rb")
+    if not file then return 0 end
+    local content = file:read("*a")
+    file:close()
+    if content:sub(1, 3) == "\xef\xbb\xbf" then
+        content = content:sub(4)
+    end
+    local count = 0
+    for line in content:gmatch("[^\r\n]+") do
+        if line:sub(1, 1) ~= "#" and line:match("\t") then
+            count = count + 1
+        end
+    end
+    return count
+end
+
+--- 导出调序数据到文件（返回导出条目数，若失败或被保护拒绝则返回 nil）
+---@param db LevelDB
+---@param schema_id string
+---@return integer | nil
+local function export_to_file(db, schema_id)
+    -- 如果 schema_id 为 nil，则跳过导出
+    if not schema_id then return nil end
+    
+    -- 如果数据库连接失败，跳过导出
+    if not db or not db:loaded() then
+        return nil
+    end
+    
+    local sync_file_name = get_export_file_name(schema_id)
+    if not sync_file_name then return nil end
+
+    -- 【导出保护】统计备份文件条目数
+    local txt_entries = count_txt_entries(schema_id)
+
+    -- 【关键修复】只查询一次数据库，同时用于统计和写入，避免两次查询之间数据库状态变化
+    local da = db:query("")
+    if not da then return nil end
+
+    -- 统计数据库条目数（同时收集数据）
+    local db_entries = 0
+    local export_data = {}
+    for key, value in da:iter() do
+        if key:sub(1, 1) ~= "\001" then
+            db_entries = db_entries + 1
+            table.insert(export_data, {key = key, value = value})
+        end
+    end
+    da = nil
+
+    -- 【导出保护】如果备份存在且条目数 >= 数据库条目数，则拒绝覆盖
+    if txt_entries > 0 and db_entries <= txt_entries then
+        return nil
+    end
+
+    -- 开始导出，覆盖旧文件，使用二进制模式确保UTF-8 BOM正确写入
+    local file = io.open(sync_file_name, "wb")
+    if not file then return nil end
+
+    -- 写入 UTF-8 BOM，确保工具能正确识别编码
+    file:write("\xef\xbb\xbf")
 
     -- 获取当前Windows用户名
     local current_username = os.getenv("USERNAME") or "unknown1"
 
-    ---@type nil | DbAccessor
-    local da = db:query("")
-    if not da then
-        file:close()
-        return
+    -- 先写入当前用户ID行（使用 # 作为注释前缀，避免控制字符导致二进制识别）
+    file:write(string.format("#/user_id\t%s\n", current_username))
+
+    -- 写入收集的数据
+    for _, item in ipairs(export_data) do
+        local line = string.format("%s\t%s\n", item.key, item.value)
+        file:write(line)
     end
 
-    -- 先写入当前用户ID行
-    file:write(string.format("%s\t%s\n", "\001/user_id", current_username))
-
-    for key, value in da:iter() do
-        -- 跳过原/user_id行避免重复写入
-        if key ~= "\001/user_id" then
-            local line = string.format("%s\t%s\n", key, value)
-            file:write(line)
-        end
-    end
-
-    log.info(string.format("[super_sequence] 已导出排序数据至文件 %s", sync_file_name))
     file:close()
-    need_export = false  -- 重置标记
+    _need_export[schema_id] = false  -- 重置标记
+    return db_entries
 end
 
-local function import_from_file(db)
-    -- 如果 sync_file_name 为 nil，则跳过导入
-    if not sync_file_name then return end
+local function import_from_file(db, schema_id)
+    -- 如果 schema_id 为 nil，则跳过导入
+    if not schema_id then return false, 0 end
+    
+    -- 如果数据库连接失败，跳过导入
+    if not db or not db:loaded() then
+        return false, 0
+    end
+    
+    -- 如果该方案已被清空，跳过自动导入
+    if _cleared_schemas[schema_id] then
+        return false, 0
+    end
+    
+    local sync_file_name = get_export_file_name(schema_id)
+    if not sync_file_name then return false, 0 end
 
-    local file = io.open(sync_file_name, "r")
+    -- 使用二进制模式读取，处理 UTF-8 BOM
+    local file = io.open(sync_file_name, "rb")
     if not file then
-        log.info("[super_sequence] 未找到排序数据文件，跳过导入")
-        return
+        return false, 0
+    end
+
+    -- 读取全部内容并处理 BOM
+    local content = file:read("*a")
+    file:close()
+    
+    -- 移除 UTF-8 BOM（如果存在）
+    if content:sub(1, 3) == "\xef\xbb\xbf" then
+        content = content:sub(4)
     end
 
     local import_count = 0
 
-    for line in file:lines() do
+    -- 按行分割处理
+    for line in content:gmatch("[^\r\n]+") do
         if line == "" then goto continue end
 
-        -- 忽略系统元数据行
-        if line:sub(1, 2) == "\001" .. "/" then goto continue end
+        -- 忽略系统元数据行（注释行以 # 开头）
+        if line:sub(1, 1) == "#" then goto continue end
 
         -- 数据处理逻辑（保持不变）
         local key, value = string.match(line, "^(.-)\t(.+)$")
@@ -417,20 +573,20 @@ local function import_from_file(db)
             end
 
             import_count = import_count + 1
-            save_adjustment(code, phrase, info.to_position, info.updated_at)
+            save_adjustment(code, phrase, info.to_position, info.updated_at, schema_id)
         end
 
         ::continue::
     end
 
-    log.info(string.format("[super_sequence] 自动导入排序数据 %s 条", import_count))
-    file:close()
-    need_export = true  -- 导入后标记需要导出
+    _need_export[schema_id] = true  -- 导入后标记需要导出
+    return true, import_count
 end
 
 --- 清空数据库
-local function clear_database()
-    local db, close_db = get_user_db()
+local function clear_database(schema_id)
+    local db, close_db = get_user_db(schema_id)
+    if not db or not db:loaded() then return end
     
     -- 遍历删除所有键
     local accessor = db:query("")
@@ -444,16 +600,17 @@ local function clear_database()
     close_db()
     
     -- 重新初始化数据库
-    _user_db = nil
-    get_user_db()
+    _user_dbs[schema_id] = nil
+    get_user_db(schema_id)
     
-    log.info("[super_sequence] 已清空手动调序数据库")
-    need_export = true  -- 标记需要导出
+    _need_export[schema_id] = false  -- 清除导出标记，防止退出时导出空数据覆盖备份
+    _cleared_schemas[schema_id] = true  -- 设置清空标记，阻止自动导入
 end
 
 ---执行排序调整
 ---@param context Context
-local function process_adjustment(context)
+---@param schema_id string 方案ID
+local function process_adjustment(context, schema_id)
     local selected_cand = context:get_selected_candidate()
 
     if cur_adjust_offset == nil then -- 如果是重置/置顶，直接设置位置
@@ -462,7 +619,7 @@ local function process_adjustment(context)
         local adjustment_key = is_function_mode_active(context)
             and context.composition:back().selected_index
             or selected_cand.text
-        save_adjustment(code, adjustment_key, in_pin_mode and 1 or nil)
+        save_adjustment(code, adjustment_key, in_pin_mode and 1 or nil, nil, schema_id)
     else -- 否则进入 filter 调整位移
         cur_adjustment_phrase = selected_cand.text
     end
@@ -475,9 +632,10 @@ local function process_adjustment(context)
 end
 
 local P = {}
-function P.init()
-    local db = get_user_db()
-    import_from_file(db)
+function P.init(env)
+    local schema_id = env and env.engine and env.engine.schema and env.engine.schema.schema_id
+    local db = get_user_db(schema_id)
+    import_from_file(db, schema_id)
 end
 
 -- P 阶段按键处理
@@ -537,7 +695,6 @@ function P.func(key_event, env)
         if is_function_mode_active(context)
             and not context:get_property("sequence_adjustment_code")
         then
-            log.warning(string.format("[sequence] 暂不支持当前指令的手动排序"))
             return RIME_PROCESS_RESULTS.kNoop
         end
 
@@ -559,7 +716,8 @@ function P.func(key_event, env)
             return RIME_PROCESS_RESULTS.kNoop
         end
 
-        process_adjustment(context)
+        local schema_id = env.engine and env.engine.schema and env.engine.schema.schema_id
+        process_adjustment(context, schema_id)
         return RIME_PROCESS_RESULTS.kAccepted
     end
 
@@ -570,21 +728,165 @@ local F = {}
 function F.init() end
 
 function F.fini()
-    local db, db_close = get_user_db()
-    if need_export then
-        export_to_file(db)
+    local schema_id = current_schema_id
+    
+    if _need_export[schema_id] then
+        local db = get_user_db(schema_id)
+        export_to_file(db, schema_id)
     end
-    db_close()
+    
+    local _, close_db = get_user_db(schema_id)
+    close_db()
+    
+    cur_adjustment_phrase = nil
+    cur_highlight_idx = nil
+    cur_adjust_offset = 0
+    in_pin_mode = false
+    pin_candidate_index = nil
+    last_adjustment = nil
+    mobile_candidate_order = {}
+    current_schema_id = nil
 end
 
 ---@param input Translation
 ---@param env Env
 function F.func(input, env)
     local context = env.engine.context
+    local schema_id = env.engine and env.engine.schema and env.engine.schema.schema_id
+    current_schema_id = schema_id
+    
     -- 处理清空数据库指令（生成空候选）
     if env.engine.context.input == "/txql" then
-        clear_database()
-        yield(Candidate("clear_db", 0, #context.input, "※ 手动调序数据库已清空", ""))
+        clear_database(schema_id)
+        yield(Candidate("clear_db", 0, #context.input, "※ 当前方案调序数据库已清空（备份保留）", ""))
+        return
+    end
+    
+    -- 处理手动导出指令（导出到文本文件）
+    if env.engine.context.input == "/txdc" then
+        local db = get_user_db(schema_id)
+        if not db or not db:loaded() then
+            yield(Candidate("export_db", 0, #context.input, "※ 导出失败：数据库连接失败", ""))
+            return
+        end
+        
+        -- 1. 统计数据库有效条目数
+        local accessor = db:query("")
+        local db_entries = 0
+        if accessor then
+            for key, _ in accessor:iter() do
+                if key:sub(1, 1) ~= "\001" then
+                    db_entries = db_entries + 1
+                end
+            end
+            accessor = nil
+        end
+        
+        -- 2. 统计备份文件条目数
+        local txt_entries = count_txt_entries(schema_id)
+        
+        -- 3. 预先判断保护条件，直接提示（避免依赖 export_to_file 返回值）
+        if txt_entries > 0 and db_entries <= txt_entries then
+            yield(Candidate("export_db", 0, #context.input, "※ 导出失败：已有有效备份，请先执行 /txdr 恢复", ""))
+            return
+        end
+        
+        -- 4. 执行实际导出（此时允许覆盖）
+        local count = export_to_file(db, schema_id)
+        if count == nil then
+            yield(Candidate("export_db", 0, #context.input, "※ 导出失败：未知错误", ""))
+        elseif count > 0 then
+            yield(Candidate("export_db", 0, #context.input, "※ 成功导出 " .. count .. " 条数据", ""))
+        else
+            yield(Candidate("export_db", 0, #context.input, "※ 导出失败：当前数据库无调序数据", ""))
+        end
+        return
+    end
+    
+    -- 处理手动导入指令（从文本文件恢复）
+    if env.engine.context.input == "/txdr" then
+        local db = get_user_db(schema_id)
+        -- 手动导入时临时清除清空标记，允许导入
+        local was_cleared = _cleared_schemas[schema_id]
+        _cleared_schemas[schema_id] = nil
+        
+        local success, count = import_from_file(db, schema_id)
+        if success and count and count > 0 then
+            yield(Candidate("import_db", 0, #context.input, "※ 成功导入 " .. count .. " 条数据", ""))
+        elseif success and count == 0 then
+            yield(Candidate("import_db", 0, #context.input, "※ 导入（无新记录）", ""))
+        else
+            -- 导入失败，恢复清空标记
+            if was_cleared then
+                _cleared_schemas[schema_id] = true
+            end
+            yield(Candidate("import_db", 0, #context.input, "※ 导入失败：备份不存在或无数据", ""))
+        end
+        return
+    end
+    
+    -- 处理调序统计指令（查看所有调序数据）
+    if env.engine.context.input == "/txtj" then
+        local db = get_user_db(schema_id)
+        if not db or not db:loaded() then
+            yield(Candidate("query_db", 0, #context.input, "※ 调序统计：数据库连接失败", ""))
+            return
+        end
+        
+        local all_phrases = {}
+        local seen = {}
+        
+        local accessor = db:query("")
+        if accessor then
+            for key, _ in accessor:iter() do
+                if key:sub(1, 1) ~= "\001" then
+                    local phrase = key:match("^.-|(.+)$")
+                    if phrase and not seen[phrase] then
+                        seen[phrase] = true
+                        table.insert(all_phrases, {phrase = phrase, source = "db"})
+                    end
+                end
+            end
+            accessor = nil
+        end
+        
+        local sync_file_name = get_export_file_name(schema_id)
+        if sync_file_name then
+            local file = io.open(sync_file_name, "rb")
+            if file then
+                local content = file:read("*a")
+                file:close()
+                if content:sub(1, 3) == "\xef\xbb\xbf" then
+                    content = content:sub(4)
+                end
+                for line in content:gmatch("[^\r\n]+") do
+                    if line:sub(1, 1) ~= "#" then
+                        local key = string.match(line, "^(.-)\t")
+                        if key then
+                            local phrase = key:match("^.-|(.+)$")
+                            if phrase and not seen[phrase] then
+                                seen[phrase] = true
+                                table.insert(all_phrases, {phrase = phrase, source = "file"})
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        
+        local count = #all_phrases
+        if count == 0 then
+            yield(Candidate("query_db", 0, #context.input, "※ 调序统计：当前无调序数据", ""))
+        else
+            local lines = {}
+            for i, item in ipairs(all_phrases) do
+                local tag = item.source == "file" and "〔备份〕" or ""
+                table.insert(lines, string.format("%d. %s %s", i, item.phrase, tag))
+            end
+            local header = "=== 调序统计 ===\n共 " .. count .. " 条记录（含备份）\n------------------------\n"
+            local content = header .. table.concat(lines, "\n")
+            yield(Candidate("query_db", 0, #context.input, content, "按空格上屏"))
+        end
         return
     end
     
@@ -595,6 +897,12 @@ function F.func(input, env)
             yield(cand)
         end
         return
+    end
+
+    -- 次日第一次打字自动导出调序数据（受保护）
+    if should_auto_export(schema_id) then
+        local db = get_user_db(schema_id)
+        export_to_file(db, schema_id)
     end
 
     -- 处理数字键调序操作（移动端下滑数字）
@@ -618,16 +926,17 @@ function F.func(input, env)
         end
 
         -- 应用数据库中已有的全部调序记录
-        local user_adjustment = get_adjustment(code)
+        -- 关键修复：from_position 应该动态计算当前位置，而不是基于原始顺序
+        local user_adjustment = get_adjustment(code, schema_id)
         if user_adjustment then
-            -- 为每个记录绑定候选及其当前原始位置
+            -- 为每个记录绑定候选
             for pos, cand in ipairs(candidates) do
                 local key = is_func_mode and tostring(pos - 1) or cand.text
                 if user_adjustment[key] then
                     user_adjustment[key].candidate = cand
-                    user_adjustment[key].from_position = pos
                 end
             end
+            
             -- 按时间排序，逐个应用
             local list = {}
             for _, info in pairs(user_adjustment) do
@@ -636,21 +945,23 @@ function F.func(input, env)
                 end
             end
             table.sort(list, function(a, b) return a.updated_at < b.updated_at end)
+            
+            -- 逐个应用调序记录，动态计算 from_position
             for _, record in ipairs(list) do
-                if record.from_position and record.from_position ~= record.to_position then
-                    local from = record.from_position
-                    local to = record.to_position
-                    table.remove(candidates, from)
-                    table.insert(candidates, to, record.candidate)
-                    -- 修正其他记录的 from_position（因为数组移位）
-                    for _, r in ipairs(list) do
-                        if r.from_position then
-                            local minp = math.min(from, to)
-                            local maxp = math.max(from, to)
-                            if minp <= r.from_position and r.from_position <= maxp then
-                                r.from_position = r.from_position + (to < from and 1 or -1)
-                            end
+                if record.to_position and record.to_position > 0 then
+                    -- 动态查找当前位置
+                    local from = nil
+                    for pos, cand in ipairs(candidates) do
+                        if cand == record.candidate then
+                            from = pos
+                            break
                         end
+                    end
+                    
+                    if from and from ~= record.to_position then
+                        local to = record.to_position
+                        table.remove(candidates, from)
+                        table.insert(candidates, to, record.candidate)
                     end
                 end
             end
@@ -667,19 +978,19 @@ function F.func(input, env)
                         table.insert(candidates, target, moved)
                         -- 保存新位置（实际上恢复）
                         local key = is_func_mode and tostring(target - 1) or moved.text
-                        save_adjustment(code, key, target)
+                        save_adjustment(code, key, target, nil, schema_id)
                         break
                     end
                 end
                 last_adjustment = nil
             end
         elseif pin_idx >= 2 and pin_idx <= #candidates then
-            -- 前移一位
+            -- 前移一位：基于当前列表位置
             local moved = table.remove(candidates, pin_idx)
             local new_pos = pin_idx - 1
             table.insert(candidates, new_pos, moved)
             local key = is_func_mode and tostring(new_pos - 1) or moved.text
-            save_adjustment(code, key, new_pos)
+            save_adjustment(code, key, new_pos, nil, schema_id)
             last_adjustment = { code = code, text = moved.text, from_position = pin_idx }
         end
 
@@ -701,7 +1012,7 @@ function F.func(input, env)
     last_adjustment = nil
 
     local adjust_code = extract_adjustment_code(context)
-    local user_adjustment = get_adjustment(adjust_code)
+    local user_adjustment = get_adjustment(adjust_code, schema_id)
 
     local has_unsaved_adjustment = cur_adjustment_phrase ~= nil
         and cur_adjust_offset ~= 0
@@ -728,13 +1039,13 @@ function F.func(input, env)
             local adjust_key = is_func_mode and tostring(dedupe_position - 1) or text
             if user_adjustment and user_adjustment[adjust_key] then
                 user_adjustment[adjust_key].candidate = cand
-                user_adjustment[adjust_key].from_position = dedupe_position
             end
             dedupe_position = dedupe_position + 1
         end
     end
 
     -- 应用数据库中的调序记录（如果有）
+    -- 关键修复：动态查找当前位置，而不是使用绑定的 from_position
     if user_adjustment ~= nil then
         local list = {}
         for _, info in pairs(user_adjustment) do
@@ -744,20 +1055,20 @@ function F.func(input, env)
         end
         table.sort(list, function(a, b) return a.updated_at < b.updated_at end)
         for _, record in ipairs(list) do
-            if record.from_position and record.from_position ~= record.to_position then
-                local from = record.from_position
-                local to = record.to_position
-                table.remove(candidates, from)
-                table.insert(candidates, to, record.candidate)
-                -- 修正其他记录的 from_position
-                for _, r in ipairs(list) do
-                    if r.from_position then
-                        local minp = math.min(from, to)
-                        local maxp = math.max(from, to)
-                        if minp <= r.from_position and r.from_position <= maxp then
-                            r.from_position = r.from_position + (to < from and 1 or -1)
-                        end
+            if record.to_position and record.to_position > 0 then
+                -- 动态查找当前位置
+                local from = nil
+                for pos, cand in ipairs(candidates) do
+                    if cand == record.candidate then
+                        from = pos
+                        break
                     end
+                end
+                
+                if from and from ~= record.to_position then
+                    local to = record.to_position
+                    table.remove(candidates, from)
+                    table.insert(candidates, to, record.candidate)
                 end
             end
         end
@@ -786,7 +1097,7 @@ function F.func(input, env)
                 table.insert(candidates, to_position, cur_candidate)
                 local adjust_key = is_func_mode and cur_raw_index or cur_adjustment_phrase
                 if adjust_key then
-                    save_adjustment(adjust_code, adjust_key, to_position)
+                    save_adjustment(adjust_code, adjust_key, to_position, nil, schema_id)
                     cur_highlight_idx = to_position - 1
                 end
             end
@@ -831,15 +1142,15 @@ local function sorter(input, env)
     end
     
     local input_len = #(env.engine.context.input or "")
-    -- 1码时仅限制候选数量，不排序（简码候选无需排序，用户会继续输入第二码）
-    local limit = (input_len <= 1) and 50 or MAX_CANDIDATES
+    -- 1码时限制候选数量并排序，让常用字排在前面
+    local limit = (input_len <= 1) and 25 or MAX_CANDIDATES
 
     local candidates = {}
     for cand in input:iter() do
         if #candidates >= limit then break end
         table.insert(candidates, cand)
     end
-    if input_len > 1 and #candidates > 1 then
+    if #candidates > 1 then
         table.sort(candidates, function(a, b) return (a.quality or 0) > (b.quality or 0) end)
     end
     for _, cand in ipairs(candidates) do yield(cand) end

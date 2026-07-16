@@ -500,4 +500,7 @@ end
 -- days_until() - 计算日期差
 -- generate_candidates() - 生成候选词
 
-return schedule
+-- 翻译器模块导出（Rime标准格式）
+local function init(env) end
+
+return { init = init, func = schedule }
