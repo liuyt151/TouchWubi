@@ -211,7 +211,7 @@ preset_keyboards:
   ### 第4行
       - { click: eisu_toggle_符_symbols, width: 14, name: symbol, preview: false }
       - { click: eisu_toggle_123_number, width: 12, has_menu: text_halfperiod, name: number, preview: false }
-      - { click: commit_fullcomma, width: 10, label: ，, long_click: commit_half_comma, swipe_up: "-" }
+      - { click: commit_fullcomma, width: 10, label: ，, long_click: commit_half_comma, swipe_up: "-", swipe_down: send_comma }
       - { click: space, width: 28, name: space, swipe_up: select_second, preview: false }
       - { click: commit_fulldot, width: 10, label: 。, long_click: commit_halfperiod, swipe_up: "+", swipe_down: send_dot }
       - { click: eisu_toggle_ABC_english_schema_easy_en, width: 12, has_menu: text_halfcomma, name: english, preview: false }
@@ -275,7 +275,7 @@ preset_keyboards:
   ### 第4行
       - { click: eisu_toggle_符_symbols_land, width: 12, name: symbol, preview: false }
       - { click: eisu_toggle_123_number_land, width: 8, has_menu: text_halfperiod, name: number, preview: false }
-      - { click: commit_fullcomma, width: 6, label: ，, long_click: commit_half_comma, swipe_up: "-" }
+      - { click: commit_fullcomma, width: 6, label: ，, long_click: commit_half_comma, swipe_up: "-", swipe_down: send_comma }
       - { click: space, width: 13, name: space, swipe_up: select_second, preview: false }
       - { width: 22 }
       - { click: space, width: 13, name: space, swipe_up: select_second, preview: false }
