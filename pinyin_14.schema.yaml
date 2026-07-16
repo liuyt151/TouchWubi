@@ -47,6 +47,7 @@ switches:
 
 engine:
   processors:
+    - lua_processor@*calc_symbol_processor
     - ascii_composer
     - recognizer
     - key_binder
@@ -66,6 +67,7 @@ engine:
     - punct_segmentor
     - fallback_segmentor
   translators:
+    - lua_translator@*calculator
     - punct_translator
     - script_translator
     - reverse_lookup_translator
@@ -73,7 +75,7 @@ engine:
 # ⌨️ 拼写规则配置（Speller）
 # ========================================
 speller/+:
-  alphabet: zyxwvutsrqponmlkjihgfedcba
+  alphabet: zyxwvutsrqponmlkjihgfedcba@=
   delimiter: " '"
   algebra/+:
 # =============14键五笔映射（用于五笔拼音混输）

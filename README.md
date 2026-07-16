@@ -1,60 +1,64 @@
 # TouchWB 五笔输入法方案功能说明
 
-> 版本：v2.1
-> 原作者：Shawx
+> 版本：v2.2
+> 原作者：空山明白、Shawx
 > 维护者：Liuyt151
-> 更新日期：2026-06-29
+> 更新日期：2026-07-10
 
 ---
+
 更新日志：
-20260709：修复26键混输方案自造词无法显示问题（new_spelling误判输入模式导致comment被覆盖）；统一wubi_pinyin_filter编码提取逻辑适配所有候选类型；提高自造词quality值使混输方案自造词排在第一候选；
+20260713：优化超级调序，增加调序数据手动导出导入功能，增加调序数据次日自动导出功能
+20260713：修复标点符号问题，有候选时可以正常跟随标点，无候选时标点按pair_punct.lua逻辑
+20260712：修复26键每个字母两个简码字仅显示键名汉字（字根）不显示一级简码的问题
+20260710：重新整理 README.md，修正与代码不符的功能描述，删除已移除的功能，补充遗漏的依赖说明
+20260709：修复26键混输方案自造词无法显示问题（new_spelling误判输入模式导致comment被覆盖）；
+20260709：统一wubi_pinyin_filter编码提取逻辑适配所有候选类型；
+20260709：提高自造词quality值使混输方案自造词排在第一候选；
 20260707：修复计算器模式下的小数点输入，修复数字键盘数学符号的输入，修复14键成对符号的引用
-20260705：拼音反查支持词组
-20260701：Submit_text 新增14键双键模糊匹配与标准编码自动查询。
+20260705：五笔方案拼音反查支持词组
+20260701：Submit_text.lua 新增14键双键模糊匹配与标准编码自动查询。
 20260629：新增 wubi_pinyin_filter.lua 第五码拼音筛选过滤器；
-20260627：实现了手动排序和自动排序和第五码拼音筛选重码词
+20260627：super_sequence.lua新增手动排序和自动排序
 20260606：优化14键造词编码生成逻辑，确保模糊输入也能生成正确的标准五笔编码。
 20260605：super_sequence 新增移动端数字键调序与自动词频排序；
 20260605：input_statistics 新增语音输入过滤与跨平台自动检测；
-20260605：schedule 新增 /rq /sj /xq /dt 快捷命令；
-20260605：添加分号上屏第二候选功能，完善快捷操作体系；
-20260529：实现了手机电脑均使用根目录user_coined_ext.txt存储手动造词，且14键26键相互输出对方自造词。
-20260527：实现了手机电脑均使用根目录wubi.txt自动造词，且14键26键相互输出对方自造词。
+20260605：schedule 新增 日期/rq 时间/sj 星期/xq 农历/dt 快捷命令；
+20260605：添加分号引号分别上屏第二三候选功能，完善快捷操作体系；
+20260529：实现了手机电脑手动造词均使用根目录user_coined_ext.txt存储，且14键26键相互输出对方自造词。
+20260527：实现了手机电脑自动造词均使用根目录wubi.txt，且14键26键相互输出对方自造词。
 20260527：实现了14键布局可以按词频在候选栏中进行排序。
-
-## Liuyt151 贡献说明
-
-本项目由 **Shawx** 基于空山明月方案底包创建，**Liuyt151** 在此基础上进行了以下优化与功能扩展：
-
-### 布局与词库优化
-
-- **14键拇指键盘布局**：专为手机端设计，Z键独立，适合拇指击键，26键与14键均适配横屏分屏布局
-- **14键专用音辅版字典**：通过第5位音辅码有效降低重码率，提升拇指输入效率
-
-### 功能模块优化与新增
-
-| 模块 | 说明 |
-|------|------|
-| wubi_pinyin_filter.lua | 14键候选筛选过滤器，支持双键模糊匹配与第五码拼音首字母筛选 |
-| super_sequence.lua | 手工调频与自动词频排序，支持PC快捷键与移动端数字键调序 |
-| new_spelling.lua | 字根拆分显示模块，自动适配纯五笔/五笔拼音混输方案 |
-| input_statistics.lua | 输入统计模块，支持多维度统计、语音过滤与跨平台自动检测 |
-| email_suffix_translator.lua | 邮箱后缀智能补全，输入@自动提示常用邮箱域名 |
 
 ---
 
 ## 一、方案概述
 
-TouchWB 是一款基于触宝输入法样式的五笔输入法方案，设计14键拇指键盘布局，Z键独立，适合拇指击键。方案支持纯五笔、五笔拼音混合输入等多种模式，配合14键专用音辅版字典可有效降低重码。
+TouchWB 是一款基于触宝输入法样式的五笔输入法方案，专为移动端优化设计，支持26键标准布局和14键拇指布局，提供纯五笔、五笔拼音混合输入等多种模式。
 
 ### 支持的输入方案
 
-| 方案ID | 方案名称 | 说明 |
-|--------|----------|------|
-| wubi | 纯净五笔 | 纯五笔输入模式 |
-| wubi_pinyin_mix | 笔音双混 | 五笔拼音混合输入模式 |
-| wubi_14 | 拇指五笔 | 14键拇指键盘纯五笔 |
-| wubi_pinyin_mix_14 | 拇指笔音双混 | 14键拇指键盘五笔拼音混合 |
+| 方案ID | 方案名称 | 布局 | 输入模式 | 说明 |
+|--------|----------|------|----------|------|
+| wubi | 流萤五笔 | 26键 | 纯五笔 | 标准26键纯五笔输入，支持z键拼音反查 |
+| wubi_14 | 拇指五笔 | 14键 | 纯五笔 | 14键拇指键盘纯五笔，支持双键模糊匹配与第五码筛选 |
+| wubi_pinyin_mix | 流萤双混 | 26键 | 五笔拼音混输 | 26键五笔拼音混合输入，支持拼音首字母缩写 |
+| wubi_pinyin_mix_14 | 拇指双混 | 14键 | 五笔拼音混输 | 14键拇指键盘混输，支持双键模糊匹配与第五码筛选 |
+
+### 方案继承关系
+
+```
+wubi（26键纯五笔）
+  └── wubi_14（14键纯五笔）- 继承 wubi
+wubi_pinyin_mix（26键混输）
+  └── wubi_pinyin_mix_14（14键混输）- 继承 wubi_pinyin_mix
+```
+
+### 平台支持
+
+| 平台 | 主题支持 | 配置文件 |
+|------|----------|----------|
+| PC（小狼毫/鼠须管） | 否（使用系统主题） | `weasel.yaml` / `weasel.custom.yaml` |
+| 移动端（同文/仓/超越输入法） | 是 | `themes/` 目录下的主题文件 |
 
 ---
 
@@ -64,19 +68,35 @@ TouchWB 是一款基于触宝输入法样式的五笔输入法方案，设计14�
 
 **功能描述**：在五笔的基础上支持拼音输出，实现形码、音码混打。
 
-**实现文件**：`wubi_pinyin_mix.schema.yaml`
+**适用方案**：`wubi_pinyin_mix`、`wubi_pinyin_mix_14`
 
 **特性**：
 - 五笔编码直接输入汉字
 - 拼音输入自动反查五笔编码
 - 智能识别输入模式（五笔/拼音）
-- 支持首字母缩写输入
+- 拼音首字母缩写输入（通过 `abbrev` 规则实现）
+- 混输专用开关：`new_phrase_pinyin`（隐声/显声）切换词组拼音/字根拆分显示
+
+**实现文件**：`wubi_pinyin_mix.schema.yaml`、`wubi_pinyin_mix_14.schema.yaml`
+
+**关键配置**（混输方案特有）：
+```yaml
+engine:
+  mixed_input: true    # 告诉 new_spelling.lua 这是混输方案
+speller:
+  algebra:
+    - abbrev/^([a-z]).+$/$1/        # 首字母缩写
+    - abbrev/^([zcs]h).+$/$1/       # zh/ch/sh 首字母缩写
+```
 
 ---
 
-### 2. 五笔拼音候选筛选 (wubi_pinyin_filter.lua)
+### 2. 14键双键模糊匹配与第五码拼音筛选
 
-**功能描述**：14键双键布局专用过滤器，解决14键模糊输入下候选词匹配与重码筛选问题。
+**功能描述**：14键布局专用过滤器，解决双键模糊输入下的候选匹配与重码筛选问题。
+> **注意**：当前方案默认关闭四码自动上屏、五码顶字上屏。因为第五码拼音筛选功能需要输入5码进行筛选，四码自动上屏会影响此功能。
+
+**适用方案**：`wubi_14`、`wubi_pinyin_mix_14`（注：26键方案也配置了此过滤器，但 `use_key_pairs` 为 false）
 
 **实现文件**：`lua/wubi_pinyin_filter.lua`
 
@@ -93,29 +113,30 @@ wubi_pinyin_filter:
   use_last_char: false     # false=首字拼音筛选, true=末字拼音筛选
 ```
 
-**注意事项**：
-- 本过滤器应在 super_sequence*S（词频排序）之后执行
-- 14键方案需配合 xform 规则将5码截断为4码供翻译器查询
-- 仅对纯字母输入生效，造词输入不受影响
+**14键双键映射规则**（通过 speller derive 规则实现）：
+```yaml
+algebra/+:
+  - derive/w/q/     # W → Q
+  - derive/r/e/     # R → E
+  - derive/y/t/     # Y → T
+  - derive/i/u/     # I → U
+  - derive/p/o/     # P → O
+  - derive/s/a/     # S → A
+  - derive/f/d/     # F → D
+  - derive/h/g/     # H → G
+  - derive/k/j/     # K → J
+  - derive/c/x/     # C → X
+  - derive/b/v/     # B → V
+  - derive/m/n/     # M → N
+```
 
 ---
 
-### 3. 智能上屏处理器 (已集成至 Submit_text.lua)
-
-**功能描述**：智能判断五笔和拼音输入，五笔四码自动上屏，拼音保持候选状态。此功能已集成到 Submit_text.lua 中，不再作为独立文件。
-
-**实现位置**：`lua/Submit_text.lua`（commit_text_processor 函数）
-
-**判断逻辑**：
-- 五笔模式：输入长度=4，第一个候选是 table 类型（五笔字典匹配），单字自动上屏
-- 拼音模式：候选来自 reverse_lookup 类型，保持候选状态不自动上屏
-- 修复退格键触发自动上屏的问题
-
----
-
-### 4. 手工调频与自动排序 (super_sequence.lua)
+### 3. 手工调频与自动排序
 
 **功能描述**：支持候选项手动调序与自动词频排序，PC端支持Ctrl快捷键，移动端支持数字键调序。
+
+**适用方案**：全部方案
 
 **实现文件**：`lua/super_sequence.lua`
 
@@ -140,20 +161,19 @@ wubi_pinyin_filter:
 **自动词频排序**（S过滤器）：
 - 输入2码及以上时，自动按词频（quality）降序排列候选词
 - 1码输入时不排序，保留简码候选顺序
-- 可选组件，可在 schema.yaml 中配置是否启用
 
 **特性**：
-- 完全脱离 wanxiang.lua 依赖，形成独立模块
-- 支持跨方案共享调序数据
-- LevelDB 数据库存储，数据存放于 lua/sequence
+- LevelDB 数据库存储，数据存放于 `lua/sequence`
 - 跨平台智能检测：自动识别同文、仓、超越输入法、鸿蒙等平台
 - 移动端会话内候选顺序追踪，避免自动排序覆盖手动调序
 
 ---
 
-### 5. 输入处理模块 (Submit_text.lua)
+### 4. 输入处理与自造词
 
-**功能描述**：综合性输入处理脚本，集成自造词、快捷上屏、反查等多项功能，在日常打字过程中持续运行。
+**功能描述**：综合性输入处理脚本，集成自造词、快捷上屏、反查等多项功能。
+
+**适用方案**：全部方案
 
 **实现文件**：`lua/Submit_text.lua`
 
@@ -170,13 +190,11 @@ wubi_pinyin_filter:
 - 3字词：第1字1位，第2字1位，第3字2位
 - 4字及以上：前3字各1位，最后1字1位
 
-**数据存储**：`user_coined_ext.txt`
+**数据存储**：`user_coined_ext.txt`（用户目录根目录，跨平台共享）
 
-**14键优化**：14键布局造词时支持模糊输入（点击代替滑动），系统自动查询字典生成标准五笔编码，确保跨方案兼容。
-
-**14键双键匹配**：14键自造词查询支持双键模糊匹配，输入左键字母可匹配右键字母对应的自造词，实现26键与14键自造词互通。
-
-**跨平台自造词共享**：统一使用用户目录下的 `user_coined_ext.txt`，PC和手机端自动同步。
+**14键优化**：
+- 造词时支持模糊输入（点击代替滑动），系统自动查询字典生成标准五笔编码
+- 自造词查询支持双键模糊匹配，输入左键字母可匹配右键字母对应的自造词
 
 #### 4.2 快捷上屏功能
 
@@ -185,16 +203,38 @@ wubi_pinyin_filter:
 | `;`（分号） | 上屏第二候选 | 直接上屏第二位候选词 |
 | `'`（单引号） | 上屏第三候选 | 仅在反查/表格模式下生效 |
 
-#### 4.3 反查支持
+---
 
-- 在 `reverse_lookup` 或 `table` 类型的候选列表中，按单引号键快速上屏第三候选
-- 方便用户在拼音反查等场景下快速获取汉字
+### 5. 字根拆分显示
+
+**功能描述**：显示汉字的字根拆分、拼音、编码等注解信息。
+
+**适用方案**：全部方案
+
+**实现文件**：`lua/new_spelling.lua`
+
+**依赖**：`lua_reverse_db: wb_spelling`（所有4个方案均配置）
+
+**相关开关**：
+| 开关名称 | 功能 | 适用方案 |
+|----------|------|----------|
+| `new_spelling` | 显示/隐藏汉字部件拆分（字根） | 全部 |
+| `new_hide_code` | 显示/隐藏五笔字型编码（单字） | 全部 |
+| `new_hide_pinyin` | 显示/隐藏单字带声调拼音 | 全部 |
+| `new_phrase_pinyin` | 词组拼音/字根拆分切换 | 仅混输 |
+
+**特性**：
+- 自动适配纯五笔/五笔拼音混输方案（通过 `mixed_input` 标志判断）
+- 支持单字和词组的字根拆分显示
+- 支持 GB2312 字符集过滤
 
 ---
 
-### 5. 计算器功能 (calculator.lua)
+### 6. 计算器功能
 
 **功能描述**：支持数学表达式计算，输出计算结果。
+
+**适用方案**：全部方案
 
 **实现文件**：`lua/calculator.lua`
 
@@ -220,9 +260,11 @@ wubi_pinyin_filter:
 
 ---
 
-### 6. 日程模块 (schedule.lua)
+### 7. 日程模块
 
 **功能描述**：支持时间显示、节日倒计时、节气提醒及农历信息，提供多种快捷日期时间命令。
+
+**适用方案**：全部方案
 
 **实现文件**：`lua/schedule.lua`
 
@@ -249,13 +291,15 @@ wubi_pinyin_filter:
 
 ---
 
-### 7. 超级提示 (super_tips.lua)
+### 8. 超级提示
 
 **功能描述**：根据输入或候选项显示提示信息，支持表情、化学式、方程式、简码等直接上屏。
 
+**适用方案**：全部方案
+
 **实现文件**：`lua/super_tips.lua`
 
-**开关**：`关提 / 开提`
+**开关**：`super_tips`（关提/开提）
 
 **上屏键**：`/` 键（可配置）
 
@@ -267,55 +311,49 @@ wubi_pinyin_filter:
 
 ---
 
-### 8. 智能标点配对 (pair_punct.lua)
+### 9. 智能标点配对
 
 **功能描述**：自动补齐成对符号，输入左符号自动补全右符号。
 
+**适用方案**：仅 `wubi`、`wubi_pinyin_mix`（26键方案）
+
 **实现文件**：`lua/pair_punct.lua`
 
-**开关**：`关配 / 开配`
+**开关**：`pair_symbol`（关配/开配）
 
 **支持的配对符号**：
-- 引号："" 、''
+- 引号："" 、'' 、``
 - 括号：() 、[] 、{} 、<> 、（） 、【】 、〔〕
 - 书名号：《》 、〈〉 、「」 、『』
-- 其他：`` 、〖〗 、〚〛 、〘〙
+- 其他：〖〗 、〚〛 、〘〙 、［］ 、｛｝
 
 **特性**：
-- 支持单双引号直接成对输出
-- 支持回车键上屏配对符号
-- 修复符号可按回车上屏问题
+- 支持单双引号一键成对输出
+- 支持空格/回车快捷上屏
+- 退格键智能清除整个配对符号
+- 防重复触发（0.2秒内仅处理一次）
+
+**注意**：14键方案（`wubi_14`、`wubi_pinyin_mix_14`）未配置此处理器，标点配对通过主题实现。
 
 ---
 
-### 9. 简繁转换 (zh_trad)
+### 10. 简繁转换
 
----
+**功能描述**：支持简体/繁体中文转换。
 
-### 10. 字根拆分显示 (new_spelling.lua)
+**适用方案**：全部方案
 
-**功能描述**：显示汉字的字根拆分、拼音、编码等注解信息。
+**开关**：`zh_trad`（简体/繁体）
 
-**实现文件**：`lua/new_spelling.lua`
-
-**相关开关**：
-| 开关 | 功能 |
-|------|------|
-| 显码 / 隐码 | 显示/隐藏五笔字型编码 |
-| 隐根 / 显根 | 显示/隐藏汉字部件拆分（字根） |
-| 显拼 / 隐拼 | 显示/隐藏单字带声调拼音 |
-| 隐声 / 显声 | 词组拼音/字根拆分切换（仅混输有效） |
-
-**特性**：
-- 自动适配纯五笔/五笔拼音混输方案
-- 支持单字和词组的字根拆分显示
-- 支持 GB2312 字符集过滤
+**实现方式**：OpenCC 转换（配置文件：`opencc/s2t.json`）
 
 ---
 
 ### 11. 拼音反查
 
 **功能描述**：按 z 键后输入拼音，显示对应的五笔编码。
+
+**适用方案**：仅 `wubi`、`wubi_14`（纯五笔方案）
 
 **使用方法**：
 1. 按 `z` 键进入拼音反查模式
@@ -325,23 +363,28 @@ wubi_pinyin_filter:
 **特性**：
 - 支持带声调拼音显示
 - 显示字根拆分信息
+- 支持词组反查
+
+**注意**：混输方案（`wubi_pinyin_mix`、`wubi_pinyin_mix_14`）本身支持拼音输入，无需单独反查功能。
 
 ---
 
-### 12. 输入统计 (input_statistics.lua)
+### 12. 输入统计
 
 **功能描述**：统计输入数据，支持日、周、月、年多维度统计，智能过滤语音输入，跨平台自动适配。
+
+**适用方案**：全部方案
 
 **实现文件**：`lua/input_statistics.lua`
 
 **命令列表**：
 | 命令 | 功能 |
 |------|------|
-| /tj 或 tjxs | 显示统计报告 |
-| /qk 或 tjqk | 清空统计数据（保留昨日数据） |
-| /ks 或 tjks | 开始临时统计会话 |
-| /js 或 tjjs | 结束临时统计并生成报告 |
-| /tc 或 tjtc | 退出临时统计（不生成报告） |
+| /tj | 显示统计报告 |
+| /qk | 清空统计数据（保留昨日数据） |
+| /ks | 开始临时统计会话 |
+| /js | 结束临时统计并生成报告 |
+| /tc | 退出临时统计（不生成报告） |
 
 **统计内容**：
 - 上屏次数、总字数（仅统计汉字，排除标点数字）
@@ -360,9 +403,11 @@ wubi_pinyin_filter:
 
 ---
 
-### 13. 邮箱后缀补全 (email_suffix_translator.lua)
+### 13. 邮箱后缀补全
 
 **功能描述**：输入邮箱时自动显示常用邮箱后缀。
+
+**适用方案**：全部方案
 
 **实现文件**：`lua/email_suffix_translator.lua`
 
@@ -370,9 +415,11 @@ wubi_pinyin_filter:
 
 ---
 
-### 14. 符号快捷输入 (symbols.yaml)
+### 14. 符号快捷输入
 
 **功能描述**：通过 `/` 键引导快速输入特殊符号。
+
+**适用方案**：全部方案
 
 **实现文件**：`symbols.yaml`
 
@@ -389,20 +436,19 @@ wubi_pinyin_filter:
 
 ### 开关列表
 
-| 开关名称 | 状态 | 功能说明 |
-|----------|------|----------|
-| 显码 / 隐码 | 默认显码 | 显示/隐藏五笔字型编码（单字） |
-| 隐根 / 显根 | 默认显根 | 显示/隐藏汉字部件拆分（字根） |
-| 显拼 / 隐拼 | 默认显拼 | 显示/隐藏单字带声调拼音 |
-| 隐声 / 显声 | 默认隐声 | 词组拼音/字根拆分切换（仅混输） |
-| 关配 / 开配 | 默认关配 | 配对标点（括号、引号等自动成对） |
-| 关提 / 开提 | 默认关提 | 超级提示 |
-| 关译 / 开译 | 默认关译 | 中英文互译 |
-| 扩展 / 常用 | 默认扩展 | 常用字符集（GB2312）过滤 |
-| 隐表 / 显表 | 默认隐表 | Emoji 表情 |
-| 简体 / 繁体 | 默认简体 | 简繁转换 |
-| 。，/ ．， | 默认全角 | 标点符号全角/半角 |
-| 半角 / 全角 | 默认半角 | 字符全角/半角 |
+| 开关名称 | 默认状态 | 功能说明 | 适用方案 |
+|----------|----------|----------|----------|
+| `new_spelling` | 显根（26键）/ 隐根（14键） | 显示/隐藏汉字部件拆分（字根） | 全部 |
+| `new_hide_code` | 显码（26键）/ 隐码（14键） | 显示/隐藏五笔字型编码（单字） | 全部 |
+| `new_hide_pinyin` | 显拼（26键）/ 隐拼（14键） | 显示/隐藏单字带声调拼音 | 全部 |
+| `new_phrase_pinyin` | 隐声 | 词组拼音/字根拆分切换 | 仅混输 |
+| `pair_symbol` | 开配（26键）/ 未配置（14键） | 配对标点（括号、引号等自动成对） | 仅26键 |
+| `super_tips` | 关提 | 超级提示 | 全部 |
+| `GB2312` | 扩展（26键）/ 常用（14键） | 常用字符集（GB2312）过滤 | 全部 |
+| `show_es` | 隐表 | Emoji 表情 | 全部 |
+| `zh_trad` | 简体 | 简繁转换 | 全部 |
+| `full_shape` | 半角 | 字符全角/半角 | 全部 |
+| `ascii_punct` | 全角 | 标点符号全角/半角 | 全部 |
 
 ---
 
@@ -465,11 +511,11 @@ wubi_pinyin_filter:
 
 ## 五、主题支持
 
-### 主题列表
+### 主题列表（仅移动端）
 
 | 主题目录 | 适用方案 | 说明 |
 |----------|----------|------|
-| themes/t26_wubi | wubi, wubi_pinyin_mix, pinyin | 26键标准键盘主题 |
+| themes/t26_wubi | wubi, wubi_pinyin_mix | 26键标准键盘主题 |
 | themes/t14_wubi | wubi_14, wubi_pinyin_mix_14 | 14键拇指键盘主题 |
 
 ### 主题资源
@@ -480,25 +526,32 @@ wubi_pinyin_filter:
 - `number.svg` - 数字键盘图标
 - `symbols.svg` - 符号键盘图标
 
+### PC端主题
+
+PC端（小狼毫/鼠须管）使用 `weasel.yaml` 和 `weasel.custom.yaml` 配置，不使用 themes 目录。
+
 ---
 
 ## 六、词库说明
 
 ### 主词库
 
-| 词库文件 | 说明 |
-|----------|------|
-| wubi.dict.yaml | 五笔主词库 |
-| wubi.extended.dict.yaml | 五笔扩展词库 |
-| wubi_14.dict.yaml | 14键五笔词库 |
-| pinyin.dict.yaml | 拼音词库 |
-| wb_spelling.dict.yaml | 字根拆分数库 |
+| 词库文件 | 说明 | 适用方案 |
+|----------|------|----------|
+| wubi.dict.yaml | 五笔主词库 | 全部 |
+| wubi.extended.dict.yaml | 五笔扩展词库（含用户词典） | 全部 |
+| pinyin.dict.yaml | 拼音词库 | 全部 |
+| wb_spelling.dict.yaml | 字根拆分数库（含拼音、字根、编码） | 全部 |
 
 ### 扩展词库
 
 - 整合知频词库筛选的2W多词
 - 2-4字词条分别整合到五笔与拼音词典
 - 适配空山方案词序调整
+
+### 14键方案说明
+
+14键方案（`wubi_14`、`wubi_pinyin_mix_14`）使用 `wubi.extended` 词典，通过 `wubi_pinyin_filter.lua` 实现双键模糊匹配和第五码拼音筛选，**无独立的14键专用词库**（`wubi_14.dict.yaml` 已删除）。
 
 ---
 
@@ -519,16 +572,16 @@ TouchWB/
 │   │   └── userdb.lua              # 用户数据库库
 │   ├── tips/                       # 超级提示数据
 │   │   └── tips_show.txt           # 提示数据文件
-│   ├── Submit_text.lua             # 自造词模块
+│   ├── Submit_text.lua             # 输入处理与自造词模块
 │   ├── calculator.lua              # 计算器模块
 │   ├── email_suffix_translator.lua # 邮箱后缀补全
 │   ├── input_statistics.lua        # 输入统计模块
 │   ├── new_spelling.lua            # 字根拆分显示
-│   ├── pair_punct.lua              # 配对标点模块
+│   ├── pair_punct.lua              # 配对标点模块（仅26键）
 │   ├── schedule.lua                # 日程模块
 │   ├── super_sequence.lua          # 手工调频与自动排序模块
 │   ├── super_tips.lua              # 超级提示模块
-│   └── wubi_pinyin_filter.lua      # 五笔拼音候选筛选过滤器
+│   └── wubi_pinyin_filter.lua      # 14键双键匹配与第五码筛选
 ├── opencc/                         # OpenCC 转换词典
 │   ├── emoji.json                  # Emoji 转换配置
 │   ├── emoji.txt                   # Emoji 数据
@@ -536,7 +589,7 @@ TouchWB/
 │   ├── emoji_word.txt              # Emoji 词汇
 │   ├── es.json                     # Emoji 转换配置
 │   └── es.txt                      # Emoji 数据
-├── themes/                         # 主题目录
+├── themes/                         # 主题目录（仅移动端）
 │   ├── public/                     # 公共主题配置
 │   │   ├── info/                   # 方案信息
 │   │   ├── preset_candidates/      # 预设候选
@@ -556,22 +609,21 @@ TouchWB/
 │       ├── info.yaml               # 主题信息
 │       └── theme.yaml              # 主题配置
 ├── default.custom.yaml             # 默认配置定制
-├── default.yaml                    # 默认配置
+├── default.yaml                    # 默认配置（方案列表、开关保存）
 ├── info.yaml                       # 方案信息
 ├── key_bindings.yaml               # 按键绑定配置
 ├── pinyin.dict.yaml                # 拼音词库
-├── pinyin.schema.yaml              # 拼音方案
+├── pinyin.schema.yaml              # 拼音方案（依赖）
 ├── symbols.yaml                    # 符号配置
 ├── wb_spelling.dict.yaml           # 字根拆分词库
-├── wb_spelling.schema.yaml         # 字根拆分方案
-├── weasel.custom.yaml              # 小狼毫定制配置
-├── weasel.yaml                     # 小狼毫配置
+├── wb_spelling.schema.yaml         # 字根拆分方案（依赖）
+├── weasel.custom.yaml              # 小狼毫定制配置（PC端）
+├── weasel.yaml                     # 小狼毫配置（PC端）
 ├── wubi.dict.yaml                  # 五笔词库
 ├── wubi.extended.dict.yaml         # 五笔扩展词库
-├── wubi.schema.yaml                # 纯五笔方案
-├── wubi_14.dict.yaml               # 14键五笔词库
-├── wubi_14.schema.yaml             # 14键五笔方案
-├── wubi_pinyin_mix.schema.yaml     # 五笔拼音混合方案
+├── wubi.schema.yaml                # 26键纯五笔方案
+├── wubi_14.schema.yaml             # 14键纯五笔方案
+├── wubi_pinyin_mix.schema.yaml     # 26键五笔拼音混合方案
 ├── wubi_pinyin_mix_14.schema.yaml  # 14键五笔拼音混合方案
 └── 修改说明.txt                    # 版本更新记录
 ```
@@ -585,9 +637,16 @@ TouchWB/
 - 小狼毫版本：0.17.4
 
 ### 依赖方案
-- wb_spelling（字根拆分数库）
-- pinyin（拼音词库）
-- wubi（五笔词库）
+- pinyin（拼音词库，用于拼音输入和 z 键反查）
+- wb_spelling（字根拆分数库，用于字根显示和第五码筛选）
+- wubi（五笔词库，用于混输方案继承）
+
+### 反向数据库配置（全部方案）
+```yaml
+lua_reverse_db:
+  spelling: wb_spelling
+  code: wb_spelling
+```
 
 ---
 
@@ -607,12 +666,14 @@ TouchWB/
 
 | 配置项 | 影响脚本 | 说明 |
 |--------|----------|------|
-| `abbrev` 规则 | `Submit_text.lua`, `wubi_pinyin_filter.lua` | 26键混输方案特有的缩写规则，脚本针对此规则做了特殊处理 |
-| `use_key_pairs` | `wubi_pinyin_filter.lua` | 14键双键模糊匹配开关，核心功能开关 |
-| `mixed_input` | `new_spelling.lua` | 混输方案标志，脚本据此切换行为（纯五笔/混输） |
-| `lua_reverse_db` | `new_spelling.lua`, `wubi_pinyin_filter.lua` | 反向数据库配置，必须正确配置 `spelling: wb_spelling`, `code: wb_spelling` |
-| 翻译器顺序 | 所有翻译器 | `user_coined_translator` → `table_translator` → `script_translator`，顺序影响候选优先级 |
-| 过滤器顺序 | 所有过滤器 | `new_spelling` → `super_sequence*S` → `super_sequence*F` → `wubi_pinyin_filter`，顺序影响候选处理流程 |
+| `abbrev` 规则 | `Submit_text.lua`, `wubi_pinyin_filter.lua` | 26键混输方案特有的拼音首字母缩写规则 |
+| `derive` 规则 | `wubi_pinyin_filter.lua` | 14键双键映射规则 |
+| `use_key_pairs` | `wubi_pinyin_filter.lua` | 14键双键模糊匹配开关 |
+| `mixed_input` | `new_spelling.lua` | 混输方案标志，脚本据此切换行为 |
+| `lua_reverse_db` | `new_spelling.lua`, `wubi_pinyin_filter.lua` | 反向数据库配置 |
+| `pair_symbol` | `pair_punct.lua` | 配对标点开关（仅26键方案） |
+| 翻译器顺序 | 所有翻译器 | `schedule` → `punct_translator` → `table_translator` → `user_coined_translator` → `fixed` → `mkst` → `script_translator` → `reverse_lookup` → `calculator` → `email_suffix_translator` → `input_statistics` |
+| 过滤器顺序 | 所有过滤器 | `new_spelling` → `super_sequence*S` → `super_sequence*F` → `wubi_pinyin_filter` → `simplifier` → `es_conversion` → `uniquifier` |
 
 ### 9.3 数据文件路径依赖
 
@@ -637,21 +698,22 @@ TouchWB/
 本方案的 Lua 脚本与当前方案深度耦合，**单独分享 Lua 脚本无法使用**。如需分享给他人，必须提供完整的方案文件：
 
 **必需文件清单**：
-- `*.schema.yaml` — 所有方案配置文件（wubi、wubi_pinyin_mix、wubi_14、wubi_pinyin_mix_14、pinyin、pinyin_14）
-- `*.dict.yaml` — 所有词典文件（wubi、wubi.extended、wubi_14、pinyin、wb_spelling）
+- `*.schema.yaml` — 所有方案配置文件（wubi、wubi_pinyin_mix、wubi_14、wubi_pinyin_mix_14）
+- `*.dict.yaml` — 所有词典文件（wubi、wubi.extended、pinyin、wb_spelling）
 - `lua/*.lua` — 所有 Lua 脚本
 - `lua/lib/*.lua` — 库文件
 - `lua/tips/*.txt` — 超级提示数据
 - `opencc/*.json` — OpenCC 配置
-- `themes/*` — 主题文件
+- `themes/*` — 主题文件（移动端）
 - `symbols.yaml` — 符号配置
 - `default.yaml`, `info.yaml`, `key_bindings.yaml` — 基础配置
+- `weasel.yaml`, `weasel.custom.yaml` — PC端配置
 
 ---
 
 ## 十、致谢
 
-本项目由 **Shawx** 基于空山明月方案底包修改制作，**Liuyt151** 在此基础上进行了持续优化、功能增强与模块扩展。
+本项目由 **Shawx** 基于空山明月方案底包创建，**Liuyt151** 在此基础上进行了持续优化、功能增强与模块扩展。
 - **空山明月**：底包方案
 - **万象拼音方案**：super_sequence.lua、super_tips.lua
 - **知频词库**：扩展词库来源

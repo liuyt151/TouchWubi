@@ -89,13 +89,13 @@ switches:
     states: [ 简体, 繁体 ]
     comment: "简繁转换"
 
-  # 开关11：半/全角转换控制（full_shape）
+  # 开关10：半/全角转换控制（full_shape）
   - name: full_shape
     reset: 0                # 默认值为0（半角字符）
     states: [ 半角, 全角 ]
     comment: "字符全角/半角"
 
-  # 开关12：标点符号全半角控制（ascii_punct）
+  # 开关11：标点符号全半角控制（ascii_punct）
   - name: ascii_punct
     reset: 0                # 默认值为0（全角标点）
     states: [ 。，,．， ]
@@ -106,6 +106,7 @@ engine:
   mixed_input: true                        # 告诉 new_spelling.Lua 这是混输方案使（显声/隐声）有效
   # 处理器列表（processors）：按顺序处理用户输入
   processors:
+    - lua_processor@*calc_symbol_processor
     # ASCII模式切换处理器：处理中英文输入切换
     - ascii_composer
     # Lua处理器：自造词记录处理器（监控并记录用户自造词）
@@ -114,16 +115,16 @@ engine:
     - lua_processor@*super_tips
     # Lua处理器：超序列前移处理器（Super Sequence Processor）
     - lua_processor@*super_sequence*P
-    # Lua处理器：配对标点处理器
+    # Lua处理器：配对标点处理器（必须在punctuator之前，处理配对引号和候选+标点上屏）
     - lua_processor@*pair_punct*processor
+    # 标点处理器：处理标点符号输入（必须在speller之前，防止标点键进入编码栏）
+    - punctuator
     # 识别器：识别特殊输入模式（如网址、邮箱、命令等）
     - recognizer
     # 按键绑定器：处理特殊按键绑定和快捷键
     - key_binder
     # 拼写处理器：处理拼音拼写和纠错
     - speller
-    # 标点处理器：处理标点符号输入
-    - punctuator
     # 选择器：处理候选项选择操作（数字键、方向键等）
     - selector
     # 导航器：处理候选项导航操作（翻页等）
@@ -305,13 +306,14 @@ key_binder:
 
   # 按键绑定规则列表
   bindings:
-    # 绑定1：当有候选菜单时，左箭头键发送上箭头键（在候选项中向上移动）
-    - {send: Up, accept: Left, when: has_menu}
-    # 绑定2：当有候选菜单时，右箭头键发送下箭头键（在候选项中向下移动）
-    - {send: Down, accept: Right, when: has_menu}
-    # 绑定3：当有候选菜单时，减号键发送上翻页键（向上翻页）
+    - {send: Up, accept: Up, when: has_menu}
+    - {send: Down, accept: Down, when: has_menu}
+    - {send: Page_Up, accept: Left, when: has_menu}
+    - {send: Page_Down, accept: Right, when: has_menu}
     - {send: Page_Up, accept: minus, when: has_menu}
-    # 绑定4：当有候选菜单时，等号键发送下翻页键（向下翻页）
+    - {send: Page_Down, accept: plus, when: has_menu}
+    - {send: Up, accept: bracketleft, when: has_menu}
+    - {send: Down, accept: bracketright, when: has_menu}
     - {send: Page_Down, accept: equal, when: has_menu}
     # 绑定5：当有候选菜单时，空格键保持原样（选中第一个候选项）
     - {send: space, accept: space, when: has_menu}

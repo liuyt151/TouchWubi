@@ -60,19 +60,25 @@ switches:
     states: [ 扩展, 常用 ]
     comment: "常用字符集（GB2312）过滤"
 
-  # 开关6：Emoji表情显示控制（show_es）
+  # 开关6：配对标点控制（pair_symbol）
+  - name: pair_symbol
+    reset: 1                # 默认值为1（开启配对）
+    states: [ "关配", "开配" ]
+    comment: "配对标点（括号、引号等自动成对）"
+
+  # 开关7：Emoji表情显示控制（show_es）
   - name: show_es
     reset: 0                # 默认值为0（隐藏表情）
     states: [ 隐表, 显表 ]
     comment: "Emoji 表情"
 
-  # 开关7：超级提示控制（super_tips）
+  # 开关8：超级提示控制（super_tips）
   - name: super_tips
     reset: 0                # 默认值为0（关闭提示）
     states: [ 关提, 开提 ]
     comment: "超级提示"
 
-  # 开关8：简繁转换控制（zh_trad）
+  # 开关9：简繁转换控制（zh_trad）
   - name: zh_trad
     reset: 0                # 默认值为0（简体）
     states: [ 简体, 繁体 ]
@@ -93,14 +99,16 @@ switches:
 engine:
   mixed_input: true                        # 告诉 new_spelling.Lua 这是混输方案使（显声/隐声）有效
   processors:
+    - lua_processor@*calc_symbol_processor
     - ascii_composer
     - lua_processor@*Submit_text
     - lua_processor@*super_tips
     - lua_processor@*super_sequence*P
+    - lua_processor@*pair_punct*processor
+    - punctuator
     - recognizer
     - key_binder
     - speller
-    - punctuator
     - selector
     - navigator
     - express_editor
@@ -119,6 +127,7 @@ engine:
     - abc_segmentor
     - punct_segmentor
     - fallback_segmentor
+    - lua_segmentor@*pair_punct*segmentor
   translators:
     - lua_translator@*schedule                 # 日程命令（/jc 等）- 放在最前面确保优先级最高
     - punct_translator

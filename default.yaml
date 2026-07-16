@@ -10,7 +10,7 @@ schema_list:                                           # 定义可用的输入�
   - {schema: wubi_14}                                  # 方案2：拇指五笔
   - {schema: wubi_pinyin_mix}                          # 方案3：流萤双混
   - {schema: wubi_pinyin_mix_14}                       # 方案4：拇指双混
-  - {schema: wb_spelling}                              # 方案5：三重注解伪方案
+  # - {schema: wb_spelling}                              # 方案5：三重注解伪方案
 
 switcher:                                              # 方案切换设置
   caption: 【输入法设置】                              # 切换菜单的标题
@@ -64,5 +64,5 @@ ascii_composer:                                        # ASCII 字符输入设�
     Eisu_toggle: clear                                 # 英数键：清空输入
 
 menu:                                                  # 候选词菜单设置
-  page_size: 6                                         # 每页显示6个候选词
+  page_size: 9                                         # 每页显示6个候选词
   alternative_select_labels: [ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 ]  # 候选词选择标签
